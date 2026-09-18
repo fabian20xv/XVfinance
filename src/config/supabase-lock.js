@@ -1,10 +1,52 @@
 /**
- * Single source of truth for the only allowed Supabase project.
+ * Allowlist of the only two Supabase projects this repo may talk to.
  * Never point this repo at any other project.
+ *
+ * 1. Parent/prod:  krcwpupbdizzjyydzaqp
+ * 2. Develop/staging (Tess): bkwhqfkosxnoffpsjcug — staging only, never production
  */
-export const ALLOWED_SUPABASE_PROJECT_REF = 'krcwpupbdizzjyydzaqp';
-export const ALLOWED_SUPABASE_HOST = `${ALLOWED_SUPABASE_PROJECT_REF}.supabase.co`;
-export const ALLOWED_SUPABASE_URL = `https://${ALLOWED_SUPABASE_HOST}`;
+
+function freezeProject(ref, role) {
+  const host = `${ref}.supabase.co`;
+  return Object.freeze({
+    ref,
+    host,
+    url: `https://${host}`,
+    role,
+  });
+}
+
+export const PARENT_SUPABASE_PROJECT_REF = 'krcwpupbdizzjyydzaqp';
+export const DEVELOP_SUPABASE_PROJECT_REF = 'bkwhqfkosxnoffpsjcug';
+
+export const PARENT_SUPABASE_PROJECT = freezeProject(PARENT_SUPABASE_PROJECT_REF, 'parent');
+export const DEVELOP_SUPABASE_PROJECT = freezeProject(DEVELOP_SUPABASE_PROJECT_REF, 'develop');
+
+export const ALLOWED_SUPABASE_PROJECTS = Object.freeze([
+  PARENT_SUPABASE_PROJECT,
+  DEVELOP_SUPABASE_PROJECT,
+]);
+
+export const ALLOWED_SUPABASE_PROJECT_REFS = Object.freeze(
+  ALLOWED_SUPABASE_PROJECTS.map((project) => project.ref)
+);
+
+export const ALLOWED_SUPABASE_URLS = Object.freeze(
+  ALLOWED_SUPABASE_PROJECTS.map((project) => project.url)
+);
+
+/** Parent/prod pin — default when a single URL is needed (e.g. public config fallback). */
+export const ALLOWED_SUPABASE_PROJECT_REF = PARENT_SUPABASE_PROJECT_REF;
+export const ALLOWED_SUPABASE_HOST = PARENT_SUPABASE_PROJECT.host;
+export const ALLOWED_SUPABASE_URL = PARENT_SUPABASE_PROJECT.url;
+
+const PROJECTS_BY_REF = new Map(ALLOWED_SUPABASE_PROJECTS.map((project) => [project.ref, project]));
+
+export function describeAllowedSupabaseProjects() {
+  return ALLOWED_SUPABASE_PROJECTS.map(
+    (project) => `${project.url} (ref ${project.ref}, ${project.role})`
+  ).join(' or ');
+}
 
 function fail(message) {
   const error = new Error(message);
@@ -19,10 +61,7 @@ function fail(message) {
  */
 export function parseSupabaseProjectRef(urlString) {
   if (urlString == null || String(urlString).trim() === '') {
-    fail(
-      'SUPABASE_URL is required. Only ' +
-        `${ALLOWED_SUPABASE_URL} (ref ${ALLOWED_SUPABASE_PROJECT_REF}) is allowed.`
-    );
+    fail(`SUPABASE_URL is required. Only ${describeAllowedSupabaseProjects()} are allowed.`);
   }
 
   const trimmed = String(urlString).trim();
@@ -42,7 +81,7 @@ export function parseSupabaseProjectRef(urlString) {
   if (!match) {
     fail(
       `SUPABASE_URL host must be {project-ref}.supabase.co, got "${parsed.hostname}". ` +
-        `Only ${ALLOWED_SUPABASE_HOST} (ref ${ALLOWED_SUPABASE_PROJECT_REF}) is allowed.`
+        `Only ${describeAllowedSupabaseProjects()} are allowed.`
     );
   }
 
@@ -50,38 +89,40 @@ export function parseSupabaseProjectRef(urlString) {
 }
 
 /**
- * Fail loud unless SUPABASE_URL is exactly the locked XVfinance project.
+ * Fail loud unless SUPABASE_URL is exactly the parent/prod or develop/staging project.
  * @param {string} urlString
- * @returns {{ ref: string, url: string, host: string }}
+ * @returns {{ ref: string, url: string, host: string, role: 'parent' | 'develop' }}
  */
 export function assertAllowedSupabaseUrl(urlString) {
   const ref = parseSupabaseProjectRef(urlString);
   const parsed = new URL(String(urlString).trim());
+  const project = PROJECTS_BY_REF.get(ref);
 
-  if (ref !== ALLOWED_SUPABASE_PROJECT_REF) {
+  if (!project) {
     fail(
       `Refused Supabase project ref "${ref}". ` +
-        `Only ${ALLOWED_SUPABASE_PROJECT_REF} is allowed (${ALLOWED_SUPABASE_URL}).`
+        `Only ${describeAllowedSupabaseProjects()} are allowed.`
     );
   }
 
-  if (parsed.hostname.toLowerCase() !== ALLOWED_SUPABASE_HOST) {
+  if (parsed.hostname.toLowerCase() !== project.host) {
     fail(
       `Refused Supabase host "${parsed.hostname}". ` +
-        `Only ${ALLOWED_SUPABASE_HOST} is allowed.`
+        `Only ${describeAllowedSupabaseProjects()} are allowed.`
     );
   }
 
-  if (parsed.origin.toLowerCase() !== ALLOWED_SUPABASE_URL) {
+  if (parsed.origin.toLowerCase() !== project.url) {
     fail(
       `Refused Supabase origin "${parsed.origin}". ` +
-        `Only ${ALLOWED_SUPABASE_URL} is allowed.`
+        `Only ${describeAllowedSupabaseProjects()} are allowed.`
     );
   }
 
   return {
-    ref: ALLOWED_SUPABASE_PROJECT_REF,
-    host: ALLOWED_SUPABASE_HOST,
-    url: ALLOWED_SUPABASE_URL,
+    ref: project.ref,
+    host: project.host,
+    url: project.url,
+    role: project.role,
   };
 }
