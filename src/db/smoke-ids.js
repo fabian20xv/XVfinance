@@ -13,7 +13,10 @@ export const SMOKE_HOLDING_ID = 'a0000000-0000-4000-8000-000000000040';
 export const SMOKE_NOTE_ID = 'a0000000-0000-4000-8000-000000000050';
 export const SMOKE_REPORT_ID = 'a0000000-0000-4000-8000-000000000060';
 export const SMOKE_PROPOSAL_ID = 'a0000000-0000-4000-8000-000000000070';
+export const SMOKE_NOTE_PROPOSAL_ID = 'a0000000-0000-4000-8000-000000000071';
 export const SMOKE_AUDIT_ID = 'a0000000-0000-4000-8000-000000000080';
+export const SMOKE_WATCHLIST_ID = 'a0000000-0000-4000-8000-000000000090';
+export const SMOKE_WATCHLIST_ITEM_ID = 'a0000000-0000-4000-8000-000000000091';
 
 export const SMOKE_FIRM_NAME = 'XVfinance Smoke Firm';
 
@@ -32,3 +35,5 @@ export const DOMAIN_TABLES = Object.freeze([
 export const TENANCY_TABLES = Object.freeze(['firms', 'firm_members']);
 
 export const FIRM_ROLES = Object.freeze(['manager', 'analyst']);
+
+export const E3_TABLES = Object.freeze(['watchlists', 'watchlist_items', 'workspace_focus']);

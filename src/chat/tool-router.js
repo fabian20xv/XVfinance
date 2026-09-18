@@ -12,24 +12,25 @@ import {
   createChatToolEnv,
 } from '../security/service-role-guard.js';
 import { validateAgainstSchema } from './json-schema.js';
+import { PROPOSAL_TOOLS } from './proposal-tools.js';
+import { READ_TOOLS } from './read-tools.js';
+import { SESSION_TOOLS } from './session-tools.js';
+import { ToolError } from './tool-error.js';
 import { createUserScopedClient } from './user-client.js';
 
-/**
- * E2 stub catalog. E3+ read/proposal tools register here later.
- */
-export const TOOL_ALLOWLIST = Object.freeze({
-  get_session: Object.freeze({
+const CORE_TOOLS = {
+  get_session: {
     description: 'Return the authenticated user, firm, and role.',
-    schema: Object.freeze({
+    schema: {
       type: 'object',
       additionalProperties: false,
       properties: {},
-    }),
-    audit: Object.freeze({
+    },
+    audit: {
       action: 'session.read',
       entityTable: 'firm_members',
       sensitive: true,
-    }),
+    },
     async handler({ session }) {
       return {
         user_id: session.userId,
@@ -37,14 +38,14 @@ export const TOOL_ALLOWLIST = Object.freeze({
         role: session.role,
       };
     },
-  }),
-  health: Object.freeze({
+  },
+  health: {
     description: 'Liveness probe for the locked Supabase project.',
-    schema: Object.freeze({
+    schema: {
       type: 'object',
       additionalProperties: false,
       properties: {},
-    }),
+    },
     audit: null,
     async handler() {
       return {
@@ -53,8 +54,32 @@ export const TOOL_ALLOWLIST = Object.freeze({
         supabase_url: ALLOWED_SUPABASE_URL,
       };
     },
-  }),
+  },
+};
+
+/**
+ * E2 allowlist plus E3 read tools and E4 proposal tools.
+ */
+export const TOOL_ALLOWLIST = Object.freeze({
+  ...CORE_TOOLS,
+  ...SESSION_TOOLS,
+  ...READ_TOOLS,
+  ...PROPOSAL_TOOLS,
 });
+
+function resolveAudit(spec, { args, data, session }) {
+  if (!spec.audit) {
+    return null;
+  }
+  const audit = typeof spec.audit === 'function' ? spec.audit({ args, data, session }) : { ...spec.audit };
+  if (!audit) {
+    return null;
+  }
+  return {
+    ...audit,
+    entityId: audit.entityId ?? data?.id ?? session.userId,
+  };
+}
 
 /**
  * @param {object} options
@@ -116,11 +141,21 @@ export async function dispatchTool({
       args: validated.value,
       env: isolatedEnv,
     });
-    return { ok: true, data, audit: spec.audit ?? null };
+    return { ok: true, data, audit: resolveAudit(spec, { args: validated.value, data, session }) };
   } catch (err) {
+    if (err instanceof ToolError) {
+      return {
+        ok: false,
+        error: { code: err.code, message: err.message },
+      };
+    }
     return {
       ok: false,
       error: { code: 'tool_failed', message: err.message },
     };
   }
+}
+
+export function listToolNames(tools = TOOL_ALLOWLIST) {
+  return Object.keys(tools).sort();
 }

@@ -61,6 +61,94 @@ describe('CA-2 HTTP API', () => {
     });
   });
 
+  it('GET /v1/proposals/:id/confirm-card and workspace-panel share proposal_id', async (t) => {
+    const token = await mint();
+    const calls = [];
+    await withServer(
+      t,
+      {
+        ...sessionDeps,
+        writeAudit: async () => 'audit-card',
+        dispatch: async ({ name, args }) => {
+          calls.push({ name, args });
+          const proposal_id = args.proposal_id;
+          if (name === 'get_proposal_confirm_card') {
+            return {
+              ok: true,
+              data: {
+                ui: 'chat.confirm_card',
+                proposal_id,
+                actions: [{ action: 'confirm', path: `/v1/proposals/${proposal_id}/confirm` }],
+              },
+              audit: { action: 'proposal.confirm_card', entityTable: 'proposals', entityId: proposal_id },
+            };
+          }
+          return {
+            ok: true,
+            data: {
+              ui: 'workspace.diff_confirm_panel',
+              proposal_id,
+              actions: [{ action: 'confirm', path: `/v1/proposals/${proposal_id}/confirm` }],
+            },
+            audit: { action: 'proposal.workspace_panel', entityTable: 'proposals', entityId: proposal_id },
+          };
+        },
+      },
+      async (port) => {
+        const id = SMOKE_FIRM_ID;
+        const card = await fetch(`http://127.0.0.1:${port}/v1/proposals/${id}/confirm-card`, {
+          headers: { authorization: `Bearer ${token}` },
+        });
+        const panel = await fetch(`http://127.0.0.1:${port}/v1/proposals/${id}/workspace-panel`, {
+          headers: { authorization: `Bearer ${token}` },
+        });
+        const cardBody = await card.json();
+        const panelBody = await panel.json();
+        assert.equal(card.status, 200);
+        assert.equal(panel.status, 200);
+        assert.equal(cardBody.data.ui, 'chat.confirm_card');
+        assert.equal(panelBody.data.ui, 'workspace.diff_confirm_panel');
+        assert.equal(cardBody.data.proposal_id, id);
+        assert.equal(panelBody.data.proposal_id, cardBody.data.proposal_id);
+        assert.deepEqual(
+          calls.map((c) => c.name),
+          ['get_proposal_confirm_card', 'get_proposal_workspace_panel']
+        );
+      }
+    );
+  });
+
+  it('POST /v1/proposals/:id/confirm dispatches confirm_proposal', async (t) => {
+    const token = await mint();
+    await withServer(
+      t,
+      {
+        ...sessionDeps,
+        writeAudit: async () => 'audit-confirm',
+        dispatch: async ({ name, args, session }) => {
+          assert.equal(name, 'confirm_proposal');
+          assert.equal(args.proposal_id, SMOKE_FIRM_ID);
+          assert.equal(session.role, 'manager');
+          return {
+            ok: true,
+            data: { id: args.proposal_id, status: 'confirmed', db_status: 'applied' },
+            audit: { action: 'proposal.applied', entityTable: 'proposals', entityId: args.proposal_id },
+          };
+        },
+      },
+      async (port) => {
+        const res = await fetch(`http://127.0.0.1:${port}/v1/proposals/${SMOKE_FIRM_ID}/confirm`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${token}` },
+        });
+        const body = await res.json();
+        assert.equal(res.status, 200);
+        assert.equal(body.data.status, 'confirmed');
+        assert.equal(body.audit_id, 'audit-confirm');
+      }
+    );
+  });
+
   it('POST /v1/tools runs get_session with a user JWT and writes an audit id', async (t) => {
     const audits = [];
     const token = await mint();

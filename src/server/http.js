@@ -1,5 +1,5 @@
 /**
- * Node HTTP API: JWT session + tool router + audit writer.
+ * Node HTTP API: JWT session + tool router + audit writer + proposals.
  */
 import { createServer } from 'node:http';
 import { ALLOWED_SUPABASE_PROJECT_REF, ALLOWED_SUPABASE_URL } from '../config/supabase-lock.js';
@@ -8,6 +8,24 @@ import { writeAuditEvent } from './audit.js';
 import { ApiError } from './errors.js';
 import { bearerTokenFromHeader, verifySupabaseAccessToken } from './jwt.js';
 import { attachFirmContext } from './session.js';
+
+const UUID = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
+const PROPOSAL_PATH = new RegExp(
+  `^/v1/proposals(?:/(${UUID})(?:/(confirm|reject|confirm-card|workspace-panel))?)?$`
+);
+
+const ERROR_STATUS = {
+  unknown_tool: 404,
+  not_found: 404,
+  tool_failed: 500,
+  forbidden: 403,
+  role_required: 403,
+  expired: 409,
+  conflict: 409,
+  apply_failed: 409,
+  unauthenticated: 401,
+  invalid_args: 400,
+};
 
 function send(res, status, body) {
   const payload = JSON.stringify(body);
@@ -59,6 +77,27 @@ async function authenticate(req, deps) {
   return { token, session };
 }
 
+function intQuery(url, name) {
+  const raw = url.searchParams.get(name);
+  if (raw == null || raw === '') {
+    return undefined;
+  }
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+async function runTool(req, res, deps, name, args) {
+  const { token, session } = await authenticate(req, deps);
+  const result = await deps.dispatch({
+    name,
+    args,
+    session,
+    userJwt: token,
+    env: deps.env,
+  });
+  await finishTool(res, result, session, deps);
+}
+
 /**
  * @param {object} [options]
  */
@@ -89,16 +128,66 @@ export function createRequestListener({ env = process.env, deps = {} } = {}) {
       }
 
       if (req.method === 'GET' && path === '/v1/session') {
-        const { token, session } = await authenticate(req, resolved);
-        const result = await resolved.dispatch({
-          name: 'get_session',
-          args: {},
-          session,
-          userJwt: token,
-          env: resolved.env,
-        });
-        await finishTool(res, result, session, resolved);
+        await runTool(req, res, resolved, 'get_session', {});
         return;
+      }
+
+      const proposalMatch = path.match(PROPOSAL_PATH);
+      if (proposalMatch) {
+        const proposalId = proposalMatch[1];
+        const action = proposalMatch[2];
+
+        if (!proposalId && req.method === 'GET') {
+          const args = {
+            status: url.searchParams.get('status') || undefined,
+            kind: url.searchParams.get('kind') || undefined,
+            limit: intQuery(url, 'limit'),
+            offset: intQuery(url, 'offset'),
+          };
+          if (args.limit == null) {
+            delete args.limit;
+          }
+          if (args.offset == null) {
+            delete args.offset;
+          }
+          if (!args.status) {
+            delete args.status;
+          }
+          if (!args.kind) {
+            delete args.kind;
+          }
+          await runTool(req, res, resolved, 'list_proposals', args);
+          return;
+        }
+
+        if (proposalId && !action && req.method === 'GET') {
+          await runTool(req, res, resolved, 'get_proposal', { proposal_id: proposalId });
+          return;
+        }
+
+        if (proposalId && action === 'confirm-card' && req.method === 'GET') {
+          await runTool(req, res, resolved, 'get_proposal_confirm_card', {
+            proposal_id: proposalId,
+          });
+          return;
+        }
+
+        if (proposalId && action === 'workspace-panel' && req.method === 'GET') {
+          await runTool(req, res, resolved, 'get_proposal_workspace_panel', {
+            proposal_id: proposalId,
+          });
+          return;
+        }
+
+        if (proposalId && action === 'confirm' && req.method === 'POST') {
+          await runTool(req, res, resolved, 'confirm_proposal', { proposal_id: proposalId });
+          return;
+        }
+
+        if (proposalId && action === 'reject' && req.method === 'POST') {
+          await runTool(req, res, resolved, 'reject_proposal', { proposal_id: proposalId });
+          return;
+        }
       }
 
       if (req.method === 'POST' && path === '/v1/tools') {
@@ -131,12 +220,7 @@ export function createRequestListener({ env = process.env, deps = {} } = {}) {
 
 async function finishTool(res, result, session, deps) {
   if (!result.ok) {
-    const status =
-      result.error?.code === 'unknown_tool'
-        ? 404
-        : result.error?.code === 'tool_failed'
-          ? 500
-          : 400;
+    const status = ERROR_STATUS[result.error?.code] ?? 400;
     send(res, status, { ok: false, error: result.error });
     return;
   }
@@ -153,7 +237,8 @@ async function finishTool(res, result, session, deps) {
       payload: {
         tool: result.audit.action,
         role: session.role,
-        data: result.data,
+        entity_id: result.audit.entityId ?? null,
+        sensitive: Boolean(result.audit.sensitive),
       },
     });
   }

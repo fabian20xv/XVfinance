@@ -2,7 +2,7 @@
 /**
  * CI / pre-start assertion: this repo may only talk to one Supabase project.
  */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   ALLOWED_SUPABASE_PROJECT_REF,
@@ -65,14 +65,14 @@ if (!readme.includes('krcwpupbdizzjyydzaqp')) {
   ok('README.md states allowed project ref');
 }
 
-const migration = readFileSync(
-  resolve(root, 'supabase/migrations/20260918213000_e1_schema_rls.sql'),
-  'utf8'
-);
-if (!migration.includes('krcwpupbdizzjyydzaqp')) {
-  fail('E1 migration must name the locked project ref');
-} else {
-  ok('E1 migration is pinned to krcwpupbdizzjyydzaqp');
+const migrationsDir = resolve(root, 'supabase/migrations');
+for (const name of readdirSync(migrationsDir).filter((file) => file.endsWith('.sql'))) {
+  const sql = readFileSync(resolve(migrationsDir, name), 'utf8');
+  if (!sql.includes('krcwpupbdizzjyydzaqp')) {
+    fail(`${name} must name the locked project ref`);
+  } else {
+    ok(`${name} is pinned to krcwpupbdizzjyydzaqp`);
+  }
 }
 
 if (process.env.SUPABASE_URL) {

@@ -21,7 +21,7 @@ const env = {
 describe('CA-2.2 tool router', () => {
   it('rejects tools that are not on the allowlist', async () => {
     const result = await dispatchTool({
-      name: 'list_clients',
+      name: 'drop_production',
       args: {},
       session,
       userJwt: 'user-jwt',

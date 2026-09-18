@@ -57,12 +57,25 @@ function visit(schema, data, path, errors) {
 
   if (schema.type === 'string' && typeof data !== 'string') {
     errors.push(`${path} must be a string`);
+  } else if (schema.type === 'integer') {
+    if (typeof data !== 'number' || !Number.isInteger(data)) {
+      errors.push(`${path} must be an integer`);
+    }
   } else if (schema.type === 'number' && typeof data !== 'number') {
     errors.push(`${path} must be a number`);
   } else if (schema.type === 'boolean' && typeof data !== 'boolean') {
     errors.push(`${path} must be a boolean`);
   } else if (schema.type === 'null' && data !== null) {
     errors.push(`${path} must be null`);
+  }
+
+  if (typeof data === 'number' && Number.isFinite(data)) {
+    if (schema.minimum != null && data < schema.minimum) {
+      errors.push(`${path} must be >= ${schema.minimum}`);
+    }
+    if (schema.maximum != null && data > schema.maximum) {
+      errors.push(`${path} must be <= ${schema.maximum}`);
+    }
   }
 
   if (schema.enum && !schema.enum.includes(data)) {

@@ -59,7 +59,7 @@ The API verifies **user** JWTs issued by the locked project, attaches `firm_memb
 | Ticket | What shipped |
 | --- | --- |
 | CA-2.1 | `verifySupabaseAccessToken` checks issuer `https://krcwpupbdizzjyydzaqp.supabase.co/auth/v1`; `attachFirmContext` loads `user_id`, `firm_id`, `role` (`manager`\|`analyst`). Missing / wrong-project / service-role tokens fail loud |
-| CA-2.2 | `POST /v1/tools` allowlist + JSON Schema; user JWT client; responses `{ ok, data\|error, audit_id? }`. Stub tools: `get_session`, `health` |
+| CA-2.2 | `POST /v1/tools` allowlist + JSON Schema; user JWT client; responses `{ ok, data\|error, audit_id? }` |
 | CA-2.3 | `writeAuditEvent` inserts firm-scoped `audit_events` (service-role, server-only) for sensitive reads and proposal lifecycle action names |
 
 ```bash
@@ -67,14 +67,46 @@ npm start   # node src/index.js --serve  (requires SUPABASE_URL)
 # GET  /health          — no JWT
 # GET  /v1/session      — Authorization: Bearer <user jwt>
 # POST /v1/tools        — { "name": "get_session", "args": {} }
+# GET  /v1/proposals
+# GET  /v1/proposals/:id
+# GET  /v1/proposals/:id/confirm-card
+# GET  /v1/proposals/:id/workspace-panel
+# POST /v1/proposals/:id/confirm
+# POST /v1/proposals/:id/reject
 ```
+
+## Read tools + workspace focus (E3)
+
+Chat tools run through the E2 allowlist router with a **user-JWT** Supabase client (RLS). Sensitive reads emit `audit_events` via the server writer (service-role never reaches the tool).
+
+| Ticket | What shipped |
+| --- | --- |
+| CA-3.1 | `get_session_context`, `set_workspace_focus` (`workspace_focus` table, self write) |
+| CA-3.2 | Paginated `list`/`get` for clients, portfolios, holdings — list items use minimized `{ id, label, … }` |
+| CA-3.5 | `get_portfolio` / `list_portfolios` include `cash_balance`, `cash_currency`, `liquidity_available`, `liquidity_buffer` |
+| CA-3.3 | `get_contact`, `list_notes` (excerpts), `get_note` — audited |
+| CA-3.4 | `watchlists` + `watchlist_items` (firm-scoped reads; mutations via proposals) |
+
+## Proposal pipeline + dual confirm (E4)
+
+Mutations to clients/contacts/holdings/notes/watchlists stay blocked for `authenticated`. Members insert `pending_confirm` proposals; confirm/reject is role-gated. A `BEFORE UPDATE` trigger on `proposals` applies the payload **in the same transaction as the confirming user** (`auth.uid()`), writing domain rows from a `private` security-definer function.
+
+| Ticket | What shipped |
+| --- | --- |
+| CA-4.1 | Proposals API: `pending` / `confirmed` / `rejected` / `expired` (+ `preview`, `expires_at`, `idempotency_key`) |
+| CA-4.2 | `confirm_proposal` / `reject_proposal` with `requires_role` (`any_member` \| `manager`); apply as confirmer |
+| CA-4.3 | Chat confirm card contract `ui: chat.confirm_card` |
+| CA-4.4 | Workspace diff/confirm panel `ui: workspace.diff_confirm_panel` — **same `proposal_id`** |
+| CA-4.5 | `propose_holding_changes`, `propose_client_upsert`, `propose_contact_upsert` |
+| CA-4.6 | `propose_watchlist_upsert` |
+| Notes | `propose_note_upsert` confirm default **`any_member`** (analyst or manager) — not manager-only |
 
 ## Setup
 
 ```bash
 cp .env.example .env   # placeholders only; never commit real keys
 npm install
-npm run ci             # lock assert + lint + tests (E0 + E1 + E2)
+npm run ci             # lock assert + lint + tests (E0 + E1 + E2 + E3 + E4)
 # Server-only, locked project only (requires real SUPABASE_SERVICE_ROLE_KEY):
 npm run seed
 npm run smoke:e1
