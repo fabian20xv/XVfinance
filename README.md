@@ -52,12 +52,29 @@ Migrations live in `supabase/migrations/` and may be applied **only** to https:/
 
 Membership helpers are `security definer` functions in the unexposed `private` schema (`private.is_firm_member`, `private.is_firm_manager`).
 
+## Auth session → Node API (E2)
+
+The API verifies **user** JWTs issued by the locked project, attaches `firm_members` context, and runs chat tools with a user-scoped Supabase client (RLS). Service-role tokens are refused.
+
+| Ticket | What shipped |
+| --- | --- |
+| CA-2.1 | `verifySupabaseAccessToken` checks issuer `https://krcwpupbdizzjyydzaqp.supabase.co/auth/v1`; `attachFirmContext` loads `user_id`, `firm_id`, `role` (`manager`\|`analyst`). Missing / wrong-project / service-role tokens fail loud |
+| CA-2.2 | `POST /v1/tools` allowlist + JSON Schema; user JWT client; responses `{ ok, data\|error, audit_id? }`. Stub tools: `get_session`, `health` |
+| CA-2.3 | `writeAuditEvent` inserts firm-scoped `audit_events` (service-role, server-only) for sensitive reads and proposal lifecycle action names |
+
+```bash
+npm start   # node src/index.js --serve  (requires SUPABASE_URL)
+# GET  /health          — no JWT
+# GET  /v1/session      — Authorization: Bearer <user jwt>
+# POST /v1/tools        — { "name": "get_session", "args": {} }
+```
+
 ## Setup
 
 ```bash
 cp .env.example .env   # placeholders only; never commit real keys
 npm install
-npm run ci             # lock assert + lint + tests (E0 + E1)
+npm run ci             # lock assert + lint + tests (E0 + E1 + E2)
 # Server-only, locked project only (requires real SUPABASE_SERVICE_ROLE_KEY):
 npm run seed
 npm run smoke:e1

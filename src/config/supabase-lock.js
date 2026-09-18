@@ -5,6 +5,7 @@
 export const ALLOWED_SUPABASE_PROJECT_REF = 'krcwpupbdizzjyydzaqp';
 export const ALLOWED_SUPABASE_HOST = `${ALLOWED_SUPABASE_PROJECT_REF}.supabase.co`;
 export const ALLOWED_SUPABASE_URL = `https://${ALLOWED_SUPABASE_HOST}`;
+export const ALLOWED_JWT_ISSUER = `${ALLOWED_SUPABASE_URL}/auth/v1`;
 
 function fail(message) {
   const error = new Error(message);

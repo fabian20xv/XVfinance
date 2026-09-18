@@ -12,6 +12,12 @@ export const SERVICE_ROLE_ENV_KEYS = Object.freeze([
   'SERVICE_ROLE_KEY',
 ]);
 
+/** Server-only secrets that must never reach chat tools (not the service-role key). */
+export const SERVER_ONLY_ENV_KEYS = Object.freeze([
+  'SUPABASE_JWT_SECRET',
+  'JWT_SECRET',
+]);
+
 const serviceRoleClients = new WeakSet();
 
 /**
@@ -46,7 +52,7 @@ export function createChatToolEnv(sourceEnv = process.env) {
   const isolated = Object.create(null);
 
   for (const [key, value] of Object.entries(sourceEnv ?? {})) {
-    if (isServiceRoleEnvKey(key)) {
+    if (isServiceRoleEnvKey(key) || SERVER_ONLY_ENV_KEYS.includes(key)) {
       continue;
     }
     isolated[key] = value;
