@@ -1,0 +1,24 @@
+{
+  "name": "xvfinance",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "AI platform for investment managers — Supabase + Node.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "assert:supabase": "node scripts/assert-supabase-lock.js",
+    "lint": "eslint .",
+    "test": "node --test test/*.test.js",
+    "ci": "npm run assert:supabase && npm run lint && npm test"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.4"
+  },
+  "devDependencies": {
+    "eslint": "^9.15.0",
+    "globals": "^15.12.0"
+  }
+}
