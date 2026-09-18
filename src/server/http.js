@@ -14,6 +14,8 @@ const PROPOSAL_PATH = new RegExp(
   `^/v1/proposals(?:/(${UUID})(?:/(confirm|reject|confirm-card|workspace-panel))?)?$`
 );
 const REPORT_EXPORT_PATH = new RegExp(`^/v1/reports/(${UUID})/export$`);
+const REPORT_RECEIPTS_PATH = new RegExp(`^/v1/reports/(${UUID})/receipts$`);
+const MEETING_EXPORT_PATH = new RegExp(`^/v1/reports/(${UUID})/meeting-export$`);
 const SCRATCHPAD_IMPACT_PATH = new RegExp(`^/v1/scratchpads/(${UUID})/impact$`);
 
 const ERROR_STATUS = {
@@ -27,6 +29,7 @@ const ERROR_STATUS = {
   apply_failed: 409,
   unmatched_symbols: 409,
   not_published: 409,
+  not_sent: 409,
   unauthenticated: 401,
   invalid_args: 400,
 };
@@ -198,6 +201,22 @@ export function createRequestListener({ env = process.env, deps = {} } = {}) {
       if (reportExport && req.method === 'GET') {
         await runTool(req, res, resolved, 'export_published_report', {
           report_id: reportExport[1],
+        });
+        return;
+      }
+
+      const reportReceipts = path.match(REPORT_RECEIPTS_PATH);
+      if (reportReceipts && req.method === 'GET') {
+        await runTool(req, res, resolved, 'get_meeting_receipts', {
+          report_id: reportReceipts[1],
+        });
+        return;
+      }
+
+      const meetingExport = path.match(MEETING_EXPORT_PATH);
+      if (meetingExport && req.method === 'GET') {
+        await runTool(req, res, resolved, 'export_meeting_one_pager', {
+          report_id: meetingExport[1],
         });
         return;
       }

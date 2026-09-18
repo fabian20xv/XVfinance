@@ -47,6 +47,15 @@ describe('CA-1.4 seed/smoke refuse any project except krcwpupbdizzjyydzaqp', () 
     assert.match(result.stderr, /Refused Supabase project ref/);
   });
 
+  it('smoke-e9.js fails loud when pointed at another Supabase project', () => {
+    const result = runScript('scripts/smoke-e9.js', {
+      SUPABASE_URL: WRONG_URL,
+      SUPABASE_SERVICE_ROLE_KEY: 'server-only-key-not-used',
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Refused Supabase project ref/);
+  });
+
   it('seed-dev.js fails when the service-role key is still a placeholder even on the locked URL', () => {
     const result = runScript('scripts/seed-dev.js', {
       SUPABASE_URL: LOCKED_URL,

@@ -224,4 +224,37 @@ describe('CA-2 HTTP API', () => {
       }
     );
   });
+
+  it('GET /v1/reports/:id/receipts dispatches get_meeting_receipts', async (t) => {
+    const token = await mint();
+    await withServer(
+      t,
+      {
+        ...sessionDeps,
+        writeAudit: async () => 'audit-receipts',
+        dispatch: async ({ name, args }) => {
+          assert.equal(name, 'get_meeting_receipts');
+          return {
+            ok: true,
+            data: {
+              ui: 'workspace.receipts_panel',
+              report_id: args.report_id,
+              public_url: null,
+              receipts: [],
+            },
+            audit: { action: 'meeting.receipts', entityTable: 'reports', entityId: args.report_id },
+          };
+        },
+      },
+      async (port) => {
+        const res = await fetch(`http://127.0.0.1:${port}/v1/reports/${SMOKE_FIRM_ID}/receipts`, {
+          headers: { authorization: `Bearer ${token}` },
+        });
+        const body = await res.json();
+        assert.equal(res.status, 200);
+        assert.equal(body.data.ui, 'workspace.receipts_panel');
+        assert.equal(body.data.public_url, null);
+      }
+    );
+  });
 });

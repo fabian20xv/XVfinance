@@ -72,6 +72,18 @@ export function buildPreview(kind, payload = {}) {
         watermark: payload.watermark ?? 'SCRATCHPAD — not live / not source of truth',
         source_of_truth: false,
       };
+    case 'meeting_send':
+      return {
+        title: 'Send meeting 1-pager',
+        summary: `${payload.title ?? payload.report_id ?? 'Meeting 1-pager'} via ${payload.channel ?? 'export'}`,
+        diff: {
+          report_id: payload.report_id,
+          channel: payload.channel ?? 'export',
+          receipts: payload.receipts ?? [],
+          public_url: null,
+        },
+        receipts: payload.receipts ?? [],
+      };
     default:
       return {
         title: kind,

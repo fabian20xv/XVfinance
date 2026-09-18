@@ -74,6 +74,8 @@ npm start   # node src/index.js --serve  (requires SUPABASE_URL)
 # POST /v1/proposals/:id/confirm
 # POST /v1/proposals/:id/reject
 # GET  /v1/reports/:id/export
+# GET  /v1/reports/:id/receipts
+# GET  /v1/reports/:id/meeting-export
 # POST /v1/imports/holdings
 # GET  /v1/scratchpads/:id/impact
 ```
@@ -142,18 +144,27 @@ Scratchpads are watermarked **not live / not source of truth**. Impact vs live h
 | CA-8.2 | `get_scratchpad_impact` (read-only vs live holdings) |
 | CA-8.3 | `promote_scratchpad` → `scratchpad_promote` proposal (manager confirm) |
 
-E9 Meeting Ghostwriter is **out of scope** for this revision.
+## Meeting Ghostwriter + Receipts (E9)
+
+Ghostwrite writes a **draft** meeting 1-pager (via `reports` with `purpose = meeting_one_pager`) that cites firm-scoped receipts. Client-facing email/export requires a manager `meeting_send` proposal. No anonymous public URL.
+
+| Ticket | What shipped |
+| --- | --- |
+| CA-9.1 | `ghostwrite_meeting_one_pager` drafts a 1-pager citing notes, holdings snapshots, proposals, and reports |
+| CA-9.2 | Receipts panel `ui: workspace.receipts_panel` (`get_meeting_receipts`); each receipt is firm-scoped and auditable |
+| CA-9.3 | `propose_meeting_send` (manager confirm, channel `email` \| `export`) + `export_meeting_one_pager` (audited; `public_url` always null) |
 
 ## Setup
 
 ```bash
 cp .env.example .env   # placeholders only; never commit real keys
 npm install
-npm run ci             # lock assert + lint + tests (E0–E8)
+npm run ci             # lock assert + lint + tests (E0–E9)
 # Server-only, locked project only (requires real SUPABASE_SERVICE_ROLE_KEY):
 npm run seed
 npm run smoke:e1
 npm run smoke:e5e8
+npm run smoke:e9
 ```
 
 Start (requires `SUPABASE_URL` in the environment):

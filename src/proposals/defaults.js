@@ -14,6 +14,7 @@ export const DEFAULT_REQUIRES_ROLE = Object.freeze({
   report_publish: 'manager',
   holdings_import: 'manager',
   scratchpad_promote: 'manager',
+  meeting_send: 'manager',
 });
 
 export const PROPOSAL_KINDS = Object.freeze(Object.keys(DEFAULT_REQUIRES_ROLE));

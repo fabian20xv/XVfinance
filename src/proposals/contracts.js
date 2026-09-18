@@ -48,7 +48,7 @@ export function confirmCard(proposal) {
  */
 export function workspacePanel(proposal) {
   const preview = proposal.preview ?? {};
-  return {
+  const panel = {
     ui: 'workspace.diff_confirm_panel',
     proposal_id: proposal.id,
     kind: proposal.kind,
@@ -61,6 +61,12 @@ export function workspacePanel(proposal) {
     expires_at: proposal.expires_at ?? null,
     actions: proposalActions(proposal.id),
   };
+  if (proposal.kind === 'meeting_send') {
+    panel.receipts = preview.receipts ?? proposal.payload?.receipts ?? [];
+    panel.receipts_ui = 'workspace.receipts_panel';
+    panel.public_url = null;
+  }
+  return panel;
 }
 
 /**
