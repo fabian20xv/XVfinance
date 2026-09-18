@@ -65,6 +65,16 @@ if (!readme.includes('krcwpupbdizzjyydzaqp')) {
   ok('README.md states allowed project ref');
 }
 
+const migration = readFileSync(
+  resolve(root, 'supabase/migrations/20260918213000_e1_schema_rls.sql'),
+  'utf8'
+);
+if (!migration.includes('krcwpupbdizzjyydzaqp')) {
+  fail('E1 migration must name the locked project ref');
+} else {
+  ok('E1 migration is pinned to krcwpupbdizzjyydzaqp');
+}
+
 if (process.env.SUPABASE_URL) {
   try {
     assertAllowedSupabaseUrl(process.env.SUPABASE_URL);

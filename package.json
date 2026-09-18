@@ -10,6 +10,8 @@
   "scripts": {
     "start": "node src/index.js",
     "assert:supabase": "node scripts/assert-supabase-lock.js",
+    "seed": "node scripts/seed-dev.js",
+    "smoke:e1": "node scripts/smoke-e1.js",
     "lint": "eslint .",
     "test": "node --test test/*.test.js",
     "ci": "npm run assert:supabase && npm run lint && npm test"

@@ -38,12 +38,29 @@ The service-role key is a server secret. It must never reach the model, the chat
 
 `createChatToolRunner` builds a frozen env **without** service-role secrets and requires a user JWT so RLS applies. ESLint rule `xvfinance/no-service-role-in-chat` (chat + client files) and `test/service-role-isolation.test.js` fail if those trees read the key or import `src/server`.
 
+## Schema + RLS (E1)
+
+Migrations live in `supabase/migrations/` and may be applied **only** to https://krcwpupbdizzjyydzaqp.supabase.co. Do not `supabase link`, migrate, or seed any other project.
+
+| Ticket | What shipped |
+| --- | --- |
+| CA-1.1 | `firms`, `firm_members` with roles `manager` \| `analyst` |
+| CA-1.2 | `clients`, `contacts`, `portfolios`, `instruments`, `holdings`, `notes`, `reports`, `proposals`, `audit_events` — all with `firm_id` |
+| CA-1.5 | `portfolios.cash_balance`, `cash_currency`, `liquidity_available`, `liquidity_buffer` |
+| CA-1.3 | RLS enabled; firm-scoped select (all members read all firm clients); high-PII / holdings / notes have **no** direct `authenticated` writes (proposal apply / service-role only); proposal confirm is manager-gated when `requires_manager` |
+| CA-1.4 | `npm run seed` / `npm run smoke:e1` use the service-role key on the locked URL only and **fail loud** otherwise |
+
+Membership helpers are `security definer` functions in the unexposed `private` schema (`private.is_firm_member`, `private.is_firm_manager`).
+
 ## Setup
 
 ```bash
 cp .env.example .env   # placeholders only; never commit real keys
 npm install
-npm run ci             # lock assert + lint + tests
+npm run ci             # lock assert + lint + tests (E0 + E1)
+# Server-only, locked project only (requires real SUPABASE_SERVICE_ROLE_KEY):
+npm run seed
+npm run smoke:e1
 ```
 
 Start (requires `SUPABASE_URL` in the environment):
