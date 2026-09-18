@@ -1,4 +1,4 @@
-name: E0 Guardrails
+name: Guardrails
 
 on:
   push:

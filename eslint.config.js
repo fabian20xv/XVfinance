@@ -16,7 +16,7 @@ export default [
     },
   },
   {
-    files: ['src/chat/**/*.js', 'src/client/**/*.js'],
+    files: ['src/chat/**/*.js', 'src/client/**/*.js', 'src/http/**/*.js'],
     plugins: { xvfinance },
     rules: {
       'xvfinance/no-service-role-in-chat': 'error',
@@ -27,7 +27,7 @@ export default [
             {
               group: ['**/server/**', '**/server/*', '**/service-role.js'],
               message:
-                'Chat tools and client bundles cannot import server/service-role modules. Use a user-JWT client so RLS applies.',
+                'Chat tools, client bundles, and HTTP smoke/health cannot import server/service-role modules. Use a user-JWT client so RLS applies.',
             },
           ],
         },

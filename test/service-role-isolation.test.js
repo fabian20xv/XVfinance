@@ -16,7 +16,7 @@ import { createServiceRoleClient, getServiceRoleKey } from '../src/server/servic
 
 const LOCKED_URL = 'https://krcwpupbdizzjyydzaqp.supabase.co';
 const ROOT = join(import.meta.dirname, '..');
-const SCAN_DIRS = ['src/chat', 'src/client'];
+const SCAN_DIRS = ['src/chat', 'src/client', 'src/http'];
 const FORBIDDEN_IN_CHAT_CLIENT = [
   'SUPABASE_SERVICE_ROLE_KEY',
   'SUPABASE_SECRET_KEY',
@@ -180,7 +180,7 @@ describe('CA-0.2 service-role key isolation', () => {
     assert.equal('SUPABASE_SERVICE_ROLE_KEY' in config, false);
   });
 
-  it('source scan: chat and client files never mention the service-role key', () => {
+  it('source scan: chat, client, and http files never mention the service-role key', () => {
     const files = SCAN_DIRS.flatMap((dir) => walk(join(ROOT, dir)));
     assert.ok(files.length > 0, 'expected chat/client source files');
 

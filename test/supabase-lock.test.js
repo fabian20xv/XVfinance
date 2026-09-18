@@ -1,34 +1,121 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { describe, it } from 'node:test';
 import { boot } from '../src/config/startup.js';
+import { getPublicSupabaseConfig } from '../src/client/public-config.js';
 import {
   ALLOWED_SUPABASE_PROJECT_REF,
+  ALLOWED_SUPABASE_PROJECT_REFS,
   ALLOWED_SUPABASE_URL,
+  ALLOWED_SUPABASE_URLS,
+  DEVELOP_SUPABASE_PROJECT_REF,
+  PARENT_SUPABASE_PROJECT_REF,
   assertAllowedSupabaseUrl,
   parseSupabaseProjectRef,
 } from '../src/config/supabase-lock.js';
 
-const LOCKED_URL = 'https://krcwpupbdizzjyydzaqp.supabase.co';
-const LOCKED_REF = 'krcwpupbdizzjyydzaqp';
+const PARENT_URL = 'https://krcwpupbdizzjyydzaqp.supabase.co';
+const PARENT_REF = 'krcwpupbdizzjyydzaqp';
+const DEVELOP_URL = 'https://bkwhqfkosxnoffpsjcug.supabase.co';
+const DEVELOP_REF = 'bkwhqfkosxnoffpsjcug';
+const THIRD_URL = 'https://abcdefghijklmnopqrst.supabase.co';
+
+function waitForListen(child, timeoutMs = 5000) {
+  return new Promise((resolve, reject) => {
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+
+    const finish = (fn, value) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      child.stdout.off('data', onStdout);
+      child.stderr.off('data', onStderr);
+      child.off('exit', onExit);
+      fn(value);
+    };
+
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      finish(reject, new Error(`timeout waiting for listen.\nstdout: ${stdout}\nstderr: ${stderr}`));
+    }, timeoutMs);
+
+    const onStdout = (chunk) => {
+      stdout += chunk;
+      const match = stdout.match(/listening on :(\d+)/i);
+      if (match) {
+        finish(resolve, Number(match[1]));
+      }
+    };
+    const onStderr = (chunk) => {
+      stderr += chunk;
+    };
+    const onExit = (code) => {
+      finish(
+        reject,
+        new Error(`process exited ${code} before listen.\nstdout: ${stdout}\nstderr: ${stderr}`)
+      );
+    };
+
+    child.stdout.on('data', onStdout);
+    child.stderr.on('data', onStderr);
+    child.on('exit', onExit);
+  });
+}
+
+async function withServer(env, fn) {
+  const child = spawn(process.execPath, ['src/index.js'], {
+    env: { ...process.env, PORT: '0', ...env },
+    encoding: 'utf8',
+  });
+  try {
+    const port = await waitForListen(child);
+    await fn(port);
+  } finally {
+    child.kill('SIGTERM');
+    await Promise.race([
+      new Promise((resolve) => child.once('close', resolve)),
+      new Promise((resolve) => setTimeout(resolve, 2000)),
+    ]);
+  }
+}
 
 describe('CA-0.1 Supabase project lock', () => {
-  it('pins the only allowed URL and ref', () => {
-    assert.equal(ALLOWED_SUPABASE_PROJECT_REF, LOCKED_REF);
-    assert.equal(ALLOWED_SUPABASE_URL, LOCKED_URL);
+  it('pins exactly the parent and develop refs', () => {
+    assert.deepEqual(ALLOWED_SUPABASE_PROJECT_REFS, [PARENT_REF, DEVELOP_REF]);
+    assert.deepEqual(ALLOWED_SUPABASE_URLS, [PARENT_URL, DEVELOP_URL]);
+    assert.equal(PARENT_SUPABASE_PROJECT_REF, PARENT_REF);
+    assert.equal(DEVELOP_SUPABASE_PROJECT_REF, DEVELOP_REF);
+    assert.equal(ALLOWED_SUPABASE_PROJECT_REF, PARENT_REF);
+    assert.equal(ALLOWED_SUPABASE_URL, PARENT_URL);
   });
 
-  it('accepts the locked project URL', () => {
-    const result = assertAllowedSupabaseUrl(LOCKED_URL);
+  it('accepts the parent/prod project URL', () => {
+    const result = assertAllowedSupabaseUrl(PARENT_URL);
     assert.deepEqual(result, {
-      ref: LOCKED_REF,
-      host: `${LOCKED_REF}.supabase.co`,
-      url: LOCKED_URL,
+      ref: PARENT_REF,
+      host: `${PARENT_REF}.supabase.co`,
+      url: PARENT_URL,
+      role: 'parent',
+    });
+  });
+
+  it('accepts the develop/staging project URL', () => {
+    const result = assertAllowedSupabaseUrl(DEVELOP_URL);
+    assert.deepEqual(result, {
+      ref: DEVELOP_REF,
+      host: `${DEVELOP_REF}.supabase.co`,
+      url: DEVELOP_URL,
+      role: 'develop',
     });
   });
 
   it('parses the project ref from the host', () => {
-    assert.equal(parseSupabaseProjectRef(LOCKED_URL), LOCKED_REF);
+    assert.equal(parseSupabaseProjectRef(PARENT_URL), PARENT_REF);
+    assert.equal(parseSupabaseProjectRef(DEVELOP_URL), DEVELOP_REF);
   });
 
   it('fails loud when SUPABASE_URL is missing', () => {
@@ -36,9 +123,9 @@ describe('CA-0.1 Supabase project lock', () => {
     assert.throws(() => boot({}), /SUPABASE_URL is required/);
   });
 
-  it('fails loud for a different Supabase project ref', () => {
+  it('fails loud for a third Supabase project ref', () => {
     assert.throws(
-      () => assertAllowedSupabaseUrl('https://abcdefghijklmnopqrst.supabase.co'),
+      () => assertAllowedSupabaseUrl(THIRD_URL),
       /Refused Supabase project ref/
     );
   });
@@ -57,13 +144,29 @@ describe('CA-0.1 Supabase project lock', () => {
     );
   });
 
-  it('startup boot accepts the lock and rejects others', () => {
-    const ok = boot({ SUPABASE_URL: LOCKED_URL });
-    assert.equal(ok.ref, LOCKED_REF);
+  it('startup boot accepts both allowlisted refs and rejects others', () => {
+    const parent = boot({ SUPABASE_URL: PARENT_URL });
+    assert.equal(parent.ref, PARENT_REF);
+    assert.equal(parent.role, 'parent');
+
+    const develop = boot({ SUPABASE_URL: DEVELOP_URL, APP_ENV: 'staging' });
+    assert.equal(develop.ref, DEVELOP_REF);
+    assert.equal(develop.role, 'develop');
 
     assert.throws(
       () => boot({ SUPABASE_URL: 'https://otherproject12345.supabase.co' }),
       /Refused Supabase project ref/
+    );
+  });
+
+  it('startup boot refuses the develop ref in production', () => {
+    assert.throws(
+      () => boot({ SUPABASE_URL: DEVELOP_URL, APP_ENV: 'production' }),
+      /develop\/staging Supabase ref/
+    );
+    assert.throws(
+      () => boot({ SUPABASE_URL: DEVELOP_URL, VERCEL_ENV: 'production' }),
+      /develop\/staging Supabase ref/
     );
   });
 
@@ -77,30 +180,65 @@ describe('CA-0.1 Supabase project lock', () => {
     assert.match(result.stderr, /Refused Supabase project ref/);
   });
 
-  it('src/index.js succeeds when pointed at the locked project', () => {
-    const result = spawnSync(process.execPath, ['src/index.js'], {
-      env: { ...process.env, SUPABASE_URL: LOCKED_URL },
-      encoding: 'utf8',
+  it('src/index.js serves health after booting the parent project', async () => {
+    await withServer({ SUPABASE_URL: PARENT_URL, APP_ENV: 'development' }, async (port) => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/health`);
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.ok, true);
+      assert.equal(body.supabaseRef, PARENT_REF);
     });
-    assert.equal(result.status, 0);
-    assert.match(result.stdout, /locked Supabase project krcwpupbdizzjyydzaqp/);
+  });
+
+  it('src/index.js serves health after booting the develop project', async () => {
+    await withServer({ SUPABASE_URL: DEVELOP_URL, APP_ENV: 'staging' }, async (port) => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/health`);
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.ok, true);
+      assert.equal(body.supabaseRef, DEVELOP_REF);
+      assert.equal(body.env, 'staging');
+    });
   });
 
   it('scripts/assert-supabase-lock.js fails when env points elsewhere', () => {
     const result = spawnSync(process.execPath, ['scripts/assert-supabase-lock.js'], {
-      env: { ...process.env, SUPABASE_URL: 'https://abcdefghijklmnopqrst.supabase.co' },
+      env: { ...process.env, SUPABASE_URL: THIRD_URL },
       encoding: 'utf8',
     });
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /process\.env\.SUPABASE_URL rejected/);
   });
 
-  it('scripts/assert-supabase-lock.js passes for the locked URL', () => {
+  it('scripts/assert-supabase-lock.js passes for the parent URL', () => {
     const result = spawnSync(process.execPath, ['scripts/assert-supabase-lock.js'], {
-      env: { ...process.env, SUPABASE_URL: LOCKED_URL },
+      env: { ...process.env, SUPABASE_URL: PARENT_URL },
       encoding: 'utf8',
     });
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /Supabase project lock asserted/);
+  });
+
+  it('scripts/assert-supabase-lock.js passes for the develop URL', () => {
+    const result = spawnSync(process.execPath, ['scripts/assert-supabase-lock.js'], {
+      env: { ...process.env, SUPABASE_URL: DEVELOP_URL },
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Supabase project lock asserted/);
+  });
+
+  it('public client config accepts either allowlisted URL', () => {
+    const parent = getPublicSupabaseConfig({
+      SUPABASE_URL: PARENT_URL,
+      SUPABASE_ANON_KEY: 'anon',
+    });
+    assert.equal(parent.url, PARENT_URL);
+
+    const develop = getPublicSupabaseConfig({
+      SUPABASE_URL: DEVELOP_URL,
+      SUPABASE_ANON_KEY: 'anon',
+    });
+    assert.equal(develop.url, DEVELOP_URL);
   });
 });

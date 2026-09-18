@@ -42,9 +42,13 @@ describe('CA-0.2 lint rule bans service-role in chat/client', () => {
     assert.ok(result.errorCount > 0, 'expected lint errors');
   });
 
-  it('allows existing chat and client source', async () => {
+  it('allows existing chat, client, and http source', async () => {
     const eslint = createLinter();
-    const results = await eslint.lintFiles(['src/chat/**/*.js', 'src/client/**/*.js']);
+    const results = await eslint.lintFiles([
+      'src/chat/**/*.js',
+      'src/client/**/*.js',
+      'src/http/**/*.js',
+    ]);
     const errorCount = results.reduce((sum, r) => sum + r.errorCount, 0);
     assert.equal(
       errorCount,
