@@ -191,4 +191,37 @@ describe('CA-2 HTTP API', () => {
       }
     );
   });
+
+  it('POST /v1/imports/holdings maps unmatched_symbols to 409', async (t) => {
+    const token = await mint();
+    await withServer(
+      t,
+      {
+        ...sessionDeps,
+        dispatch: async ({ name }) => {
+          assert.equal(name, 'import_holdings_csv');
+          return {
+            ok: false,
+            error: { code: 'unmatched_symbols', message: 'Unmatched symbols block confirm: ZZZZ' },
+          };
+        },
+      },
+      async (port) => {
+        const res = await fetch(`http://127.0.0.1:${port}/v1/imports/holdings`, {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${token}`,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            portfolio_id: SMOKE_FIRM_ID,
+            csv: 'symbol,quantity\nZZZZ,1\n',
+          }),
+        });
+        const body = await res.json();
+        assert.equal(res.status, 409);
+        assert.equal(body.error.code, 'unmatched_symbols');
+      }
+    );
+  });
 });

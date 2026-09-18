@@ -12,6 +12,8 @@ export const DEFAULT_REQUIRES_ROLE = Object.freeze({
   portfolio_upsert: 'manager',
   watchlist_upsert: 'manager',
   report_publish: 'manager',
+  holdings_import: 'manager',
+  scratchpad_promote: 'manager',
 });
 
 export const PROPOSAL_KINDS = Object.freeze(Object.keys(DEFAULT_REQUIRES_ROLE));

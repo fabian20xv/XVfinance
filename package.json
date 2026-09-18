@@ -12,6 +12,7 @@
     "assert:supabase": "node scripts/assert-supabase-lock.js",
     "seed": "node scripts/seed-dev.js",
     "smoke:e1": "node scripts/smoke-e1.js",
+    "smoke:e5e8": "node scripts/smoke-e5-e8.js",
     "lint": "eslint .",
     "test": "node --test test/*.test.js",
     "ci": "npm run assert:supabase && npm run lint && npm test"

@@ -13,6 +13,8 @@ const UUID = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-
 const PROPOSAL_PATH = new RegExp(
   `^/v1/proposals(?:/(${UUID})(?:/(confirm|reject|confirm-card|workspace-panel))?)?$`
 );
+const REPORT_EXPORT_PATH = new RegExp(`^/v1/reports/(${UUID})/export$`);
+const SCRATCHPAD_IMPACT_PATH = new RegExp(`^/v1/scratchpads/(${UUID})/impact$`);
 
 const ERROR_STATUS = {
   unknown_tool: 404,
@@ -23,6 +25,8 @@ const ERROR_STATUS = {
   expired: 409,
   conflict: 409,
   apply_failed: 409,
+  unmatched_symbols: 409,
+  not_published: 409,
   unauthenticated: 401,
   invalid_args: 400,
 };
@@ -188,6 +192,28 @@ export function createRequestListener({ env = process.env, deps = {} } = {}) {
           await runTool(req, res, resolved, 'reject_proposal', { proposal_id: proposalId });
           return;
         }
+      }
+
+      const reportExport = path.match(REPORT_EXPORT_PATH);
+      if (reportExport && req.method === 'GET') {
+        await runTool(req, res, resolved, 'export_published_report', {
+          report_id: reportExport[1],
+        });
+        return;
+      }
+
+      const scratchpadImpact = path.match(SCRATCHPAD_IMPACT_PATH);
+      if (scratchpadImpact && req.method === 'GET') {
+        await runTool(req, res, resolved, 'get_scratchpad_impact', {
+          scratchpad_id: scratchpadImpact[1],
+        });
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/v1/imports/holdings') {
+        const body = await readJsonBody(req);
+        await runTool(req, res, resolved, 'import_holdings_csv', body);
+        return;
       }
 
       if (req.method === 'POST' && path === '/v1/tools') {

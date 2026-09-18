@@ -170,5 +170,35 @@ export function createMemoryClient(seed = {}) {
     from(table) {
       return new Query(db, table);
     },
+    storage: {
+      from(bucket) {
+        return {
+          async upload(path, body, options = {}) {
+            if (!db._storage) {
+              db._storage = [];
+            }
+            const existing = db._storage.findIndex(
+              (row) => row.bucket === bucket && row.path === path
+            );
+            const row = {
+              bucket,
+              path,
+              body,
+              options,
+              uploaded_at: new Date().toISOString(),
+            };
+            if (existing >= 0) {
+              if (!options.upsert) {
+                return { data: null, error: { message: 'The resource already exists' } };
+              }
+              db._storage[existing] = row;
+            } else {
+              db._storage.push(row);
+            }
+            return { data: { path, fullPath: `${bucket}/${path}` }, error: null };
+          },
+        };
+      },
+    },
   };
 }

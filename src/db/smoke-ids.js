@@ -17,6 +17,7 @@ export const SMOKE_NOTE_PROPOSAL_ID = 'a0000000-0000-4000-8000-000000000071';
 export const SMOKE_AUDIT_ID = 'a0000000-0000-4000-8000-000000000080';
 export const SMOKE_WATCHLIST_ID = 'a0000000-0000-4000-8000-000000000090';
 export const SMOKE_WATCHLIST_ITEM_ID = 'a0000000-0000-4000-8000-000000000091';
+export const SMOKE_SCRATCHPAD_ID = 'a0000000-0000-4000-8000-000000000092';
 
 export const SMOKE_FIRM_NAME = 'XVfinance Smoke Firm';
 
@@ -37,3 +38,5 @@ export const TENANCY_TABLES = Object.freeze(['firms', 'firm_members']);
 export const FIRM_ROLES = Object.freeze(['manager', 'analyst']);
 
 export const E3_TABLES = Object.freeze(['watchlists', 'watchlist_items', 'workspace_focus']);
+
+export const E5_E8_TABLES = Object.freeze(['scratchpads']);

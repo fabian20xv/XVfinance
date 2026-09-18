@@ -12,8 +12,12 @@ import {
   createChatToolEnv,
 } from '../security/service-role-guard.js';
 import { validateAgainstSchema } from './json-schema.js';
+import { IMPORT_TOOLS } from './import-tools.js';
+import { MARKET_TOOLS } from './market-tools.js';
 import { PROPOSAL_TOOLS } from './proposal-tools.js';
 import { READ_TOOLS } from './read-tools.js';
+import { REPORT_TOOLS } from './report-tools.js';
+import { SCRATCHPAD_TOOLS } from './scratchpad-tools.js';
 import { SESSION_TOOLS } from './session-tools.js';
 import { ToolError } from './tool-error.js';
 import { createUserScopedClient } from './user-client.js';
@@ -58,13 +62,17 @@ const CORE_TOOLS = {
 };
 
 /**
- * E2 allowlist plus E3 read tools and E4 proposal tools.
+ * E2 allowlist plus E3–E8 tools (reads, proposals, reports, CSV import, market, scratchpad).
  */
 export const TOOL_ALLOWLIST = Object.freeze({
   ...CORE_TOOLS,
   ...SESSION_TOOLS,
   ...READ_TOOLS,
   ...PROPOSAL_TOOLS,
+  ...REPORT_TOOLS,
+  ...IMPORT_TOOLS,
+  ...MARKET_TOOLS,
+  ...SCRATCHPAD_TOOLS,
 });
 
 function resolveAudit(spec, { args, data, session }) {

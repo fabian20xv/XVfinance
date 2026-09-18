@@ -48,6 +48,30 @@ export function buildPreview(kind, payload = {}) {
         summary: payload.name ?? 'Portfolio upsert',
         diff: payload,
       };
+    case 'report_publish':
+      return {
+        title: 'Publish report',
+        summary: payload.title ?? payload.report_id ?? 'Publish report',
+        diff: { report_id: payload.report_id, public_url: null },
+      };
+    case 'holdings_import':
+      return {
+        title: 'Import holdings CSV',
+        summary: `${count(payload.matched)} matched, ${count(payload.unmatched)} unmatched`,
+        diff: {
+          matched: payload.matched ?? [],
+          unmatched: payload.unmatched ?? [],
+        },
+        confirm_blocked: count(payload.unmatched) > 0,
+      };
+    case 'scratchpad_promote':
+      return {
+        title: 'Promote scratchpad (not live until confirm)',
+        summary: `${count(payload.changes)} change(s) — watermarked, not source of truth until confirm`,
+        diff: payload.changes ?? [],
+        watermark: payload.watermark ?? 'SCRATCHPAD — not live / not source of truth',
+        source_of_truth: false,
+      };
     default:
       return {
         title: kind,

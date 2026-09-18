@@ -73,6 +73,9 @@ npm start   # node src/index.js --serve  (requires SUPABASE_URL)
 # GET  /v1/proposals/:id/workspace-panel
 # POST /v1/proposals/:id/confirm
 # POST /v1/proposals/:id/reject
+# GET  /v1/reports/:id/export
+# POST /v1/imports/holdings
+# GET  /v1/scratchpads/:id/impact
 ```
 
 ## Read tools + workspace focus (E3)
@@ -101,15 +104,56 @@ Mutations to clients/contacts/holdings/notes/watchlists stay blocked for `authen
 | CA-4.6 | `propose_watchlist_upsert` |
 | Notes | `propose_note_upsert` confirm default **`any_member`** (analyst or manager) — not manager-only |
 
+## Notes + draft reports (E5)
+
+Draft report writes are direct (authenticated + RLS). Publish is a manager proposal. Exports are audited JSON snapshots with `public_url: null` — no anonymous public URL.
+
+| Ticket | What shipped |
+| --- | --- |
+| CA-5.1 | `propose_note_create` / `propose_note_update` (and existing upsert). Confirm default **`any_member`** |
+| CA-5.2 | `create_report_draft`, `update_report_section` — no proposal |
+| CA-5.3 | `propose_report_publish` (manager confirm) + `export_published_report` (audited; `public_url` always null) |
+
+## CSV holdings import (E6)
+
+Uploads land in private Storage bucket `firm-imports` on **this project only**, path `{firm_id}/{user_id}/{filename}`. Unmatched symbols block confirm; manager apply upserts matched rows only (no auto-created instruments).
+
+| Ticket | What shipped |
+| --- | --- |
+| CA-6.1 | Parse CSV (`symbol`, `quantity`, optional `cost_basis` / `as_of`); store under the firm prefix |
+| CA-6.2 | `import_holdings_csv` → `holdings_import` proposal; unmatched blocks confirm; manager apply |
+
+## Market read tools (E7)
+
+Provider adapter in `src/market/provider.js`. If `MARKET_API_KEY` is missing or a placeholder, tools use `StubMarketProvider` (equities-first canned universe). Live HTTP requires `MARKET_API_KEY` + `MARKET_API_BASE`.
+
+| Ticket | What shipped |
+| --- | --- |
+| CA-7.1 | `MarketProvider` interface: quote / fundamentals / news / search |
+| CA-7.2 | `get_quote`, `get_fundamentals`, `get_news_headlines`, `search_instruments` on the E2 allowlist |
+
+## Impact Scratchpad (E8)
+
+Scratchpads are watermarked **not live / not source of truth**. Impact vs live holdings is read-only. Promote opens a manager proposal; holdings are not mutated until confirm.
+
+| Ticket | What shipped |
+| --- | --- |
+| CA-8.1 | UI contract `workspace.impact_scratchpad` + watermark payload |
+| CA-8.2 | `get_scratchpad_impact` (read-only vs live holdings) |
+| CA-8.3 | `promote_scratchpad` → `scratchpad_promote` proposal (manager confirm) |
+
+E9 Meeting Ghostwriter is **out of scope** for this revision.
+
 ## Setup
 
 ```bash
 cp .env.example .env   # placeholders only; never commit real keys
 npm install
-npm run ci             # lock assert + lint + tests (E0 + E1 + E2 + E3 + E4)
+npm run ci             # lock assert + lint + tests (E0–E8)
 # Server-only, locked project only (requires real SUPABASE_SERVICE_ROLE_KEY):
 npm run seed
 npm run smoke:e1
+npm run smoke:e5e8
 ```
 
 Start (requires `SUPABASE_URL` in the environment):

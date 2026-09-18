@@ -10,6 +10,7 @@ import {
   roleCanConfirm,
 } from '../proposals/defaults.js';
 import { buildPreview } from '../proposals/preview.js';
+import { hasUnmatchedSymbols, unmatchedMessage, unmatchedSymbols } from '../proposals/unmatched.js';
 import { applyRange, pageResult, pagination, unwrap } from './query.js';
 import { badArgs, conflict, forbidden, notFound } from './tool-error.js';
 
@@ -113,7 +114,7 @@ async function findByIdempotency(client, session, key) {
   return data;
 }
 
-async function insertProposal(client, session, { kind, payload, idempotency_key, expires_at }) {
+export async function insertProposal(client, session, { kind, payload, idempotency_key, expires_at }) {
   const existing = await findByIdempotency(client, session, idempotency_key);
   if (existing) {
     return { ...publicProposal(existing), idempotent_replay: true };
@@ -268,6 +269,9 @@ export const PROPOSAL_TOOLS = {
       }
       assertPending(row);
       assertRole(session, row, 'confirm');
+      if (row.kind === 'holdings_import' && hasUnmatchedSymbols(row.payload)) {
+        throw conflict(unmatchedMessage(unmatchedSymbols(row.payload)), 'unmatched_symbols');
+      }
       const { data, error } = await client
         .from('proposals')
         .update({
@@ -281,6 +285,9 @@ export const PROPOSAL_TOOLS = {
         .select('*')
         .maybeSingle();
       if (error) {
+        if (/unmatched symbols/i.test(error.message ?? '')) {
+          throw conflict(error.message, 'unmatched_symbols');
+        }
         throw forbidden(error.message, 'forbidden');
       }
       if (!data) {

@@ -50,3 +50,22 @@ export async function runE1Smoke(env = process.env) {
   }
   return data;
 }
+
+/**
+ * @param {NodeJS.ProcessEnv} env
+ */
+export async function runE5E8Smoke(env = process.env) {
+  boot(env);
+  const supabase = createServiceRoleClient(env);
+  const { data, error } = await supabase.rpc('smoke_e5_e8');
+  if (error) {
+    throw new Error(`smoke_e5_e8 failed: ${error.message}`);
+  }
+  if (!data?.ok) {
+    throw new Error(`E5–E8 smoke failed: ${JSON.stringify(data)}`);
+  }
+  if (data.project_ref !== 'krcwpupbdizzjyydzaqp') {
+    throw new Error(`Refused smoke project_ref ${data.project_ref}`);
+  }
+  return data;
+}
