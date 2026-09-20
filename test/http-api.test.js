@@ -177,14 +177,12 @@ describe('Tess health and smoke on the E0 HTTP API', () => {
         assert.equal((await res.json()).supabaseRef, DEVELOP_REF);
       }
     );
-    await assert.rejects(
-      () =>
-        startApiServer({
-          port: 0,
-          env: { SUPABASE_URL: THIRD_URL },
-        }),
-      /Refused Supabase project ref/
-    );
+    await assert.rejects(async () => {
+      await startApiServer({
+        port: 0,
+        env: { SUPABASE_URL: THIRD_URL },
+      });
+    }, /Refused Supabase project ref/);
   });
 
   it('POST /api/smoke rejects a missing or wrong secret', async (t) => {
