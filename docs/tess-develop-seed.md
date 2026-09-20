@@ -64,27 +64,128 @@ SUPABASE_JWT_SECRET=<develop>
 # TESS_SEED_DRY_RUN=1
 ```
 
-## Commands
+## Exact steps: apply schema to develop if behind, then seed
+
+This seed **reuses** the E1–E9 files in `supabase/migrations/` (`firms`, `firm_members`, clients, portfolios, holdings, notes, watchlists, proposals, reports, `audit_events`, …). It does not add product tables.
+
+If develop is behind main, **schema migrations must be applied to develop** before `seed:tess`. The seed fails with `Develop schema is behind main` when `firms` / `reports` / `audit_events` are missing.
+
+Do **not** run `npm run seed` (parent `run_dev_seed`) against develop. Do **not** run `npm run seed:tess` against parent. Do **not** `supabase link` / `db push` parent `krcwpupbdizzjyydzaqp` for this Tess path.
+
+### A) Apply schema/migrations to develop (only if behind)
+
+From the repo root, on a checkout that has the E1–E9 files under `supabase/migrations/`:
 
 ```bash
-# Guard only (no database writes; safe in CI)
-npm run seed:tess -- --dry-run
+# 1. Hard-stop: these commands must target develop only.
+export DEVELOP_REF=bkwhqfkosxnoffpsjcug
+export PARENT_REF=krcwpupbdizzjyydzaqp
+test "$DEVELOP_REF" = "bkwhqfkosxnoffpsjcug"
+test "$PARENT_REF" != "$DEVELOP_REF"
 
-# Write fixtures (service-role, develop only)
+# 2. Login to the Supabase CLI (once per machine).
+npx supabase login
+
+# 3. See which E1–E9 files are missing on develop. Abort if you typed the parent ref.
+npx supabase migration list --project-ref "$DEVELOP_REF"
+# NEVER: npx supabase migration list --project-ref krcwpupbdizzjyydzaqp
+
+# 4. Print what would be applied (no writes).
+npx supabase db push --project-ref "$DEVELOP_REF" --dry-run
+
+# 5. Apply pending files to develop only. You will be prompted for the
+#    develop database password (Dashboard → Project Settings → Database).
+npx supabase db push --project-ref "$DEVELOP_REF"
+```
+
+If the CLI asks you to link a project, use **only** `--project-ref bkwhqfkosxnoffpsjcug`. If `.supabase` / `supabase/.temp/project-ref` would become `krcwpupbdizzjyydzaqp`, stop.
+
+Alternative when you have a develop Postgres URL (must contain `bkwhqfkosxnoffpsjcug`; abort if it contains `krcwpupbdizzjyydzaqp`):
+
+```bash
+echo "$DEVELOP_DB_URL" | grep -q bkwhqfkosxnoffpsjcug
+echo "$DEVELOP_DB_URL" | grep -q krcwpupbdizzjyydzaqp && { echo "Refused parent DB URL"; exit 1; }
+npx supabase migration list --db-url "$DEVELOP_DB_URL"
+npx supabase db push --db-url "$DEVELOP_DB_URL" --dry-run
+npx supabase db push --db-url "$DEVELOP_DB_URL"
+```
+
+Expected local files (apply any that are Local-only on develop):
+
+- `20260918213000_e1_schema_rls.sql`
+- `20260918220000_e3_e4_watchlists_proposals.sql`
+- `20260918230000_e5_e8_reports_imports_scratchpad.sql`
+- `20260918240000_e9_meeting_ghostwriter.sql`
+
+### B) Run `npm run seed:tess` (develop URL + develop service-role)
+
+```bash
+# Develop keys only. Parent URL/keys are refused / must not be used.
+export SUPABASE_URL=https://bkwhqfkosxnoffpsjcug.supabase.co
+export SUPABASE_SERVICE_ROLE_KEY='<develop service-role>'
+export SUPABASE_ANON_KEY='<develop anon>'
+export APP_ENV=staging
+
+# Optional but recommended for Preview/Tess:
+# export SMOKE_SECRET='<shared with Tess>'
+# export SUPABASE_JWT_SECRET='<develop jwt secret>'
+
+# 1. Dry-run: asserts develop URL, prints inventory, writes nothing.
+#    Service-role may be unset for this step.
+npm run seed:tess -- --dry-run
+```
+
+Expected dry-run (exit 0):
+
+```text
+Tess develop seed dry-run OK — would write fixtures to https://bkwhqfkosxnoffpsjcug.supabase.co (ref bkwhqfkosxnoffpsjcug). Parent is forbidden.
+Inventory: 2 tenants, 4 firm members, 10 top jobs.
+```
+
+```bash
+# 2. Write fixtures (service-role required; still fails if URL is parent).
 npm run seed:tess
+```
+
+Expected live seed (exit 0):
+
+```text
+Tess develop seed OK — firms b0000000-0000-4000-8000-000000000001, b0000000-0000-4000-8000-000000000002 on https://bkwhqfkosxnoffpsjcug.supabase.co (ref bkwhqfkosxnoffpsjcug)
 ```
 
 Equivalent: `node scripts/seed-tess-develop.js`.
 
-If `SUPABASE_URL` is missing, a third project, or parent `krcwpupbdizzjyydzaqp`, the process exits non-zero with `XVfinance Tess develop seed aborted: …`.
+### Parent-refuse error (required)
 
-## Schema must exist on develop first
+If `SUPABASE_URL` is parent (or you export the parent URL by mistake):
 
-This seed **reuses** the E1–E9 schema already in `supabase/migrations/` (`firms`, `firm_members`, clients, portfolios, holdings, notes, watchlists, proposals, reports, `audit_events`, …). It does not add product tables.
+```bash
+SUPABASE_URL=https://krcwpupbdizzjyydzaqp.supabase.co npm run seed:tess
+```
 
-If develop is behind main, **schema migrations must be applied to develop** (`bkwhqfkosxnoffpsjcug`) before `seed:tess`. The seed fails with `Develop schema is behind main` when `firms` / `reports` / `audit_events` are missing.
+Expected (exit 1):
 
-Do **not** run `npm run seed` (parent `run_dev_seed`) against develop, and do **not** run `npm run seed:tess` against parent.
+```text
+XVfinance Tess develop seed aborted: Refused parent/prod Supabase ref "krcwpupbdizzjyydzaqp" (https://krcwpupbdizzjyydzaqp.supabase.co). Tess QA fixtures may only be written to develop ref bkwhqfkosxnoffpsjcug (https://bkwhqfkosxnoffpsjcug.supabase.co). Never seed Tess/QA data into the parent project.
+```
+
+A missing URL or a third `*.supabase.co` project also exits non-zero with `XVfinance Tess develop seed aborted: …`.
+
+### Expected fixture inventory summary
+
+| Count | What |
+| --- | --- |
+| 2 | Tess-labeled tenants (Alpha Wealth, Beta Advisors) |
+| 4 | Firm members (not platform admin): Alpha/Beta `manager` + `analyst` |
+| 3 | Clients + contacts |
+| 3 | Portfolios with cash/liquidity |
+| 3 | Holdings (SPY/AAPL) |
+| 3 | Notes |
+| 2 | Watchlists |
+| 1 | Pending manager-gated proposal |
+| 1 | Draft report |
+| 3 | `audit_events` readable under firm RLS |
+| 10 | Top IM jobs (see inventory below) |
 
 ## Fixture inventory
 

@@ -292,7 +292,18 @@ describe('Tess develop seed docs', () => {
     assert.match(docs, /SUPABASE_JWT_SECRET/);
     assert.match(docs, /Never set parent `?krcwpupbdizzjyydzaqp`? on Preview/);
     assert.match(docs, /schema migrations must be applied to develop/i);
+    assert.match(docs, /npx supabase db push --project-ref "\$DEVELOP_REF"/);
+    assert.match(docs, /npm run seed:tess -- --dry-run/);
+    assert.match(
+      docs,
+      /Inventory: 2 tenants, 4 firm members, 10 top jobs/
+    );
+    assert.match(
+      docs,
+      /Refused parent\/prod Supabase ref "krcwpupbdizzjyydzaqp"/
+    );
     assert.doesNotMatch(docs, /eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/);
     assert.match(readme, /Never parent `?krcwpupbdizzjyydzaqp`? on Preview/);
+    assert.match(readme, /docs\/tess-develop-seed\.md/);
   });
 });
