@@ -2,20 +2,16 @@
 
 import type { ReactNode } from 'react';
 import { AsOfChip } from '@/components/scratchpad/AsOfChip';
-import { GhostChartEmpty } from '@/components/scratchpad/GhostChartEmpty';
-import { ImpactDeltaList, type ImpactPayload } from '@/components/scratchpad/ImpactDeltaList';
 import { ScratchpadConfirmBar } from '@/components/scratchpad/ScratchpadConfirmBar';
 import { ScratchpadWatermark } from '@/components/scratchpad/ScratchpadWatermark';
-import { SCRATCHPAD_WATERMARK_SUBLINE } from '@/src/web/scratchpad-ui.js';
+import type { ImpactPayload } from '@/components/scratchpad/ImpactDeltaList';
 
 export function DraftVeil({
   open,
   dissolving,
   success,
-  confirmed,
   asOf,
   portfolioId,
-  impact,
   busy,
   canPromote,
   pendingConfirm,
@@ -32,7 +28,7 @@ export function DraftVeil({
   watermark?: string;
   asOf?: string | null;
   portfolioId?: string | null;
-  impact: ImpactPayload | null;
+  impact?: ImpactPayload | null;
   busy?: boolean;
   canPromote: boolean;
   pendingConfirm?: boolean;
@@ -47,7 +43,6 @@ export function DraftVeil({
   }
   const veilClass = [
     'draft-veil',
-    'scratch-mark',
     dissolving && !success ? 'is-dissolving' : '',
     success ? 'is-success' : '',
   ]
@@ -59,30 +54,27 @@ export function DraftVeil({
       data-ui="workspace.impact_scratchpad"
       data-source-of-truth="false"
       data-live="false"
+      aria-hidden="false"
     >
       <ScratchpadWatermark />
-      <div style={{ padding: '8px 16px', display: 'grid', gap: 4 }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <AsOfChip asOf={asOf} portfolioId={portfolioId} />
+      <AsOfChip asOf={asOf} portfolioId={portfolioId} />
+      {pendingConfirm && panel ? (
+        <div className="veil-chrome" style={{ margin: '48px 16px 0', overflow: 'auto' }}>
+          {panel}
         </div>
-        <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-muted)' }}>
-          {SCRATCHPAD_WATERMARK_SUBLINE}
-        </p>
+      ) : null}
+      <div style={{ flex: 1 }} />
+      <div className="veil-chrome">
+        <ScratchpadConfirmBar
+          busy={busy}
+          canPromote={canPromote}
+          pendingConfirm={pendingConfirm}
+          onDiscard={onDiscard}
+          onPromote={onPromote}
+          onConfirmChange={onConfirmChange}
+          onDismissProposal={onDismissProposal}
+        />
       </div>
-      <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'grid', gap: 16 }}>
-        {panel}
-        <GhostChartEmpty />
-        <ImpactDeltaList impact={impact} confirmed={confirmed} />
-      </div>
-      <ScratchpadConfirmBar
-        busy={busy}
-        canPromote={canPromote}
-        pendingConfirm={pendingConfirm}
-        onDiscard={onDiscard}
-        onPromote={onPromote}
-        onConfirmChange={onConfirmChange}
-        onDismissProposal={onDismissProposal}
-      />
     </div>
   );
 }

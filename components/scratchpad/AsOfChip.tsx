@@ -8,7 +8,7 @@ export function AsOfChip({
   portfolioId?: string | null;
 }) {
   return (
-    <span className="badge" title="as_of from API payload only">
+    <span className="asof-chip" title="as_of from API payload only">
       {formatAsOfChip(asOf, portfolioId)}
     </span>
   );

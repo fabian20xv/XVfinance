@@ -80,24 +80,17 @@ export function ReceiptSideSlip({
         }
       }}
     >
-      <header style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12 }}>
-        <strong>{receiptTitle(receipt)}</strong>
-        <span className="tabular" style={{ color: 'var(--ink-muted)' }}>
-          {index + 1}/{total}
-        </span>
-      </header>
-      <p style={{ margin: '8px 0 0', fontSize: 13 }}>
-        {body || RECEIPT_UNAVAILABLE}
-      </p>
+      <div className="slip-nav" aria-hidden="true">
+        ↑↓
+      </div>
+      <div className="slip-kicker">Receipt</div>
+      <div className="slip-title">{receiptTitle(receipt)}</div>
+      <p className="slip-body">{body || RECEIPT_UNAVAILABLE}</p>
       {deepLink ? (
-        <a
-          href={deepLink}
-          style={{ display: 'inline-block', marginTop: 8, fontSize: 12, color: 'var(--accent)' }}
-        >
-          {RECEIPT_OPEN_WORKSPACE}
+        <a href={deepLink} className="slip-action">
+          {RECEIPT_OPEN_WORKSPACE} →
         </a>
       ) : null}
-      <div style={{ marginTop: 8, fontSize: 11, color: 'var(--ink-muted)' }}>public_url: null</div>
     </aside>
   );
 }
@@ -153,7 +146,7 @@ export function ReceiptMark({
       <button
         ref={buttonRef}
         type="button"
-        className="receipt-mark"
+        className={`receipt-mark${open ? ' is-open' : ''}`}
         aria-expanded={open}
         aria-haspopup="dialog"
         onClick={(event) => {

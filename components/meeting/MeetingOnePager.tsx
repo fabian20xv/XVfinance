@@ -31,6 +31,7 @@ export function MeetingOnePager({
       <DashedEmptySlot
         label={missing ? RECEIPT_NO_LAST_MEETING : 'No meeting 1-pager loaded'}
         hint={missing ? undefined : RECEIPT_NO_LAST_MEETING}
+        question
       />
     );
   }
@@ -46,7 +47,18 @@ export function MeetingOnePager({
       {sections.length > 0
         ? sections.map((section, index) => (
             <section key={`${section.heading}-${index}`}>
-              <h3 style={{ margin: '0 0 4px', fontSize: 13 }}>{section.heading}</h3>
+              <h3
+                style={{
+                  margin: '0 0 10px',
+                  fontSize: 11,
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                  color: 'var(--ink-muted)',
+                  fontWeight: 500,
+                }}
+              >
+                {section.heading}
+              </h3>
               <p style={{ margin: 0, fontSize: 13, whiteSpace: 'pre-wrap' }}>
                 <TextWithReceiptMarks
                   text={section.body ?? ''}

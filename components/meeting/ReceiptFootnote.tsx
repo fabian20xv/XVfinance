@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { ReceiptMark, type Receipt } from '@/components/meeting/ReceiptSideSlip';
+import { DashedEmptySlot } from '@/components/workspace/DashedEmptySlot';
 import { withNullPublicUrl } from '@/src/web/dual-confirm.js';
 import {
   RECEIPT_CITE_RE,
@@ -87,10 +88,7 @@ export function ReceiptFootnote({
     const copy = emptyReason === 'no-meeting' ? RECEIPT_NO_LAST_MEETING : RECEIPT_UNAVAILABLE;
     return (
       <footer data-ui="workspace.receipts_panel" data-public-url="null" style={{ borderTop: '1px solid var(--line)', paddingTop: 8 }}>
-        <span className="receipt-mark is-missing" title={copy} aria-label={copy}>
-          [?]
-        </span>{' '}
-        <span style={{ fontSize: 12, color: 'var(--ink-muted)' }}>{copy}</span>
+        <DashedEmptySlot label={copy} question />
       </footer>
     );
   }

@@ -1,11 +1,10 @@
 'use client';
 
 import { Button } from '@/components/primitives/Button';
-import { Badge } from '@/components/primitives/Badge';
+import { SCRATCHPAD_WATERMARK_SUBLINE } from '@/src/web/scratchpad-ui.js';
 
 export function WorkspaceHeader({
   title,
-  asOf,
   scratchpadOpen,
   onEnterScratchpad,
   onShowMeeting,
@@ -20,19 +19,20 @@ export function WorkspaceHeader({
     <header
       style={{
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         gap: 8,
-        padding: '8px 16px',
+        padding: '14px 20px 10px',
         borderBottom: '1px solid var(--line)',
         minHeight: 40,
+        position: 'relative',
+        zIndex: 6,
+        background: 'var(--surface)',
       }}
     >
-      <strong style={{ fontSize: 13 }}>{title}</strong>
-      {asOf ? (
-        <Badge>
-          as of {asOf}
-        </Badge>
-      ) : null}
+      <div style={{ minWidth: 0 }}>
+        <strong style={{ fontSize: 14, letterSpacing: '-0.01em' }}>{title}</strong>
+        {scratchpadOpen ? <p className="ws-subline">{SCRATCHPAD_WATERMARK_SUBLINE}</p> : null}
+      </div>
       <span style={{ flex: 1 }} />
       {onShowMeeting ? (
         <Button variant="ghost" onClick={onShowMeeting}>
@@ -43,6 +43,8 @@ export function WorkspaceHeader({
         <Button variant="ghost" onClick={onEnterScratchpad}>
           Scratchpad
         </Button>
+      ) : scratchpadOpen ? (
+        <span className="badge">Scratchpad · explore</span>
       ) : null}
     </header>
   );

@@ -36,10 +36,9 @@ export function FocusChip({
       {entityLabel ? (
         <button
           type="button"
-          className="badge badge-accent"
+          className="focus-chip"
           onClick={onEntityClick}
-          title="Scroll to the focused entity in the workspace"
-          style={{ cursor: onEntityClick ? 'pointer' : 'default' }}
+          title="Scroll to the focused entity in the workspace only when this chip is clicked"
         >
           {entityLabel}
         </button>

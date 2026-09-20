@@ -29,6 +29,7 @@
   --danger: #b42318;
   --success: #067647;
   --draft-veil: rgba(244, 241, 232, 0.72);
+  --veil-tint: rgba(15, 110, 106, 0.12);
   --scratch-mark: #9a8f7a;
   --radius: 10px;
   --chrome-height: 48px;
@@ -144,12 +145,18 @@ body {
 .draft-veil {
   position: absolute;
   inset: 0;
-  background: var(--draft-veil);
-  z-index: 2;
+  /* Rio cool-tint ~12% on the right pane. Locked accent wins over the sketch teal. */
+  background: var(--veil-tint);
+  z-index: 5;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  pointer-events: none;
   transition: opacity var(--dissolve-ms) ease, transform var(--dissolve-ms) ease-out;
+}
+
+.draft-veil .veil-chrome {
+  pointer-events: auto;
 }
 
 .draft-veil.is-dissolving {
@@ -173,10 +180,6 @@ body {
   }
 }
 
-.scratch-mark {
-  position: relative;
-}
-
 .scratch-watermark-diagonal {
   pointer-events: none;
   position: absolute;
@@ -184,30 +187,89 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: clamp(28px, 6vw, 56px);
-  font-weight: 650;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ink);
-  opacity: 0.1;
-  transform: rotate(-18deg);
+  font-size: 42px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: rgb(11 18 32 / 0.1);
+  transform: rotate(-28deg);
   white-space: nowrap;
   user-select: none;
   z-index: 0;
 }
 
-.scratch-mark > * {
-  position: relative;
-  z-index: 1;
+.asof-chip {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  z-index: 6;
+  font-size: 10.5px;
+  color: var(--ink-muted);
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  border: 1px solid var(--line);
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+}
+
+.ws-subline {
+  margin: 3px 0 0;
+  font-size: 11.5px;
+  color: var(--ink-muted);
+  line-height: 1.35;
+  font-weight: 400;
+}
+
+.focus-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  color: var(--ink);
+  padding: 3px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+}
+
+.focus-chip::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-right: 6px;
 }
 
 .dashed-slot {
-  border: 1px dashed var(--line);
-  border-radius: var(--radius);
+  border: 1.5px dashed var(--line);
+  border-radius: 8px;
   color: var(--ink-muted);
-  padding: 16px;
-  text-align: center;
-  background: var(--paper);
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--paper) 60%, transparent);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+}
+
+.dashed-slot .q {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border: 1.5px dashed var(--line);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--ink-muted);
+  font-weight: 500;
+  flex-shrink: 0;
 }
 
 .ghost-chart {
@@ -228,14 +290,21 @@ body {
 @keyframes amber-pulse-once {
   0% {
     color: var(--amber-pulse);
+    background: rgb(217 119 6 / 0.28);
   }
   100% {
-    color: var(--ink);
+    color: var(--amber-pulse);
+    background: rgb(217 119 6 / 0.14);
   }
 }
 
 .amber-pulse {
+  display: inline-block;
   color: var(--amber-pulse);
+  background: rgb(217 119 6 / 0.14);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
   animation: amber-pulse-once var(--amber-pulse-ms) ease-out 1 forwards;
   font-variant-numeric: tabular-nums;
 }
@@ -259,24 +328,37 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 22px;
-  padding: 0 4px;
-  margin: 0 2px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: var(--paper);
-  color: var(--ink);
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  margin-left: 4px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
   font: inherit;
-  font-size: 11px;
+  font-size: 10px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
   position: relative;
+  line-height: 1;
+  vertical-align: 1px;
+}
+
+.receipt-mark.is-open {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 .receipt-mark.is-missing {
   border-style: dashed;
+  border-color: var(--line);
+  background: transparent;
   color: var(--ink-muted);
   cursor: default;
+  box-shadow: none;
 }
 
 .receipt-slip {
@@ -284,14 +366,16 @@ body {
   left: calc(100% + 8px);
   top: 0;
   z-index: 30;
-  width: min(280px, 70vw);
-  padding: 10px 12px;
+  width: 168px;
+  padding: 12px 12px 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: 0 8px 24px rgba(11, 18, 32, 0.08);
+  background: var(--paper);
+  box-shadow:
+    0 1px 2px rgb(11 18 32 / 0.04),
+    0 8px 24px rgb(11 18 32 / 0.08);
   opacity: 0;
-  transform: translateY(2px);
+  transform: translate(8px, 2px);
   animation: receipt-slip-in var(--receipt-slip-ms) ease-out forwards;
 }
 
@@ -303,8 +387,51 @@ body {
 @keyframes receipt-slip-in {
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate(0, 0);
   }
+}
+
+.receipt-slip .slip-kicker {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.receipt-slip .slip-title {
+  font-size: 12.5px;
+  font-weight: 560;
+  letter-spacing: -0.01em;
+  margin-bottom: 8px;
+  color: var(--ink);
+}
+
+.receipt-slip .slip-body {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink);
+  margin-bottom: 12px;
+}
+
+.receipt-slip .slip-action {
+  font-size: 11.5px;
+  color: var(--accent);
+  font-weight: 500;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  display: block;
+  text-decoration: none;
+}
+
+.receipt-slip .slip-nav {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 10px;
+  color: var(--ink-muted);
+  letter-spacing: 0.02em;
 }
 
 .btn {

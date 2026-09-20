@@ -500,9 +500,14 @@ export function AppShell({
     impact && typeof impact === 'object' && 'impact' in impact
       ? (impact.impact as { changed?: Array<{ symbol?: string }> })
       : (impact as { changed?: Array<{ symbol?: string }> } | null);
-  const entityLabel = scratchpad.open
-    ? focusEntityLabel(impactPayload?.changed?.[0]?.symbol ?? holdings?.[0]?.label, 'impact')
-    : null;
+  const entityLabel = focusEntityLabel(
+    impactPayload?.changed?.[0]?.symbol ?? holdings?.[0]?.label,
+    'impact'
+  );
+  const pulseSymbols = (impactPayload?.changed ?? [])
+    .map((row) => row.symbol)
+    .filter((symbol): symbol is string => Boolean(symbol));
+  const pulseCash = pulseSymbols.some((symbol) => symbol.toLowerCase() === 'cash');
 
   const runPendingAction = (action: 'confirm' | 'reject') => {
     const id = pendingCard?.proposal_id ?? pendingPanel?.proposal_id;
@@ -597,7 +602,12 @@ export function AppShell({
             ) : workspaceMode === 'report' ? (
               <ReportDraftView report={report} />
             ) : portfolioId ? (
-              <HoldingsTable holdings={holdings} cash={cash} />
+              <HoldingsTable
+                holdings={holdings}
+                cash={cash}
+                pulseSymbols={scratchpad.open ? pulseSymbols : []}
+                pulseCash={scratchpad.open && pulseCash}
+              />
             ) : (
               <EmptyWorkspace />
             )}
