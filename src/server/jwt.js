@@ -4,11 +4,10 @@
  */
 import { jwtVerify } from 'jose';
 import {
-  ALLOWED_JWT_ISSUER,
-  ALLOWED_SUPABASE_HOST,
-  ALLOWED_SUPABASE_PROJECT_REF,
-  ALLOWED_SUPABASE_URL,
+  ALLOWED_JWT_ISSUERS,
+  assertAllowedJwtIssuer,
   assertAllowedSupabaseUrl,
+  describeAllowedSupabaseProjects,
 } from '../config/supabase-lock.js';
 import { unauthorized } from './errors.js';
 
@@ -44,35 +43,16 @@ export function decodeJwtPayload(token) {
 export function assertJwtIssuer(iss) {
   if (iss == null || String(iss).trim() === '') {
     throw unauthorized(
-      `JWT missing issuer. Only ${ALLOWED_JWT_ISSUER} (ref ${ALLOWED_SUPABASE_PROJECT_REF}) is allowed.`,
+      `JWT missing issuer. Only ${describeAllowedSupabaseProjects()} are allowed.`,
       'wrong_project'
     );
   }
 
-  let parsed;
   try {
-    parsed = new URL(String(iss).trim());
+    return assertAllowedJwtIssuer(iss);
   } catch {
     throw unauthorized(
-      `JWT issuer is not a valid URL: ${iss}. Only ${ALLOWED_JWT_ISSUER} is allowed.`,
-      'wrong_project'
-    );
-  }
-
-  if (parsed.protocol !== 'https:') {
-    throw unauthorized(`JWT issuer must use https (${iss}).`, 'wrong_project');
-  }
-
-  if (parsed.hostname.toLowerCase() !== ALLOWED_SUPABASE_HOST) {
-    throw unauthorized(
-      `Refused JWT issuer host "${parsed.hostname}". Only ${ALLOWED_SUPABASE_HOST} (ref ${ALLOWED_SUPABASE_PROJECT_REF}) is allowed.`,
-      'wrong_project'
-    );
-  }
-
-  if (parsed.origin.toLowerCase() !== ALLOWED_SUPABASE_URL) {
-    throw unauthorized(
-      `Refused JWT issuer origin "${parsed.origin}". Only ${ALLOWED_SUPABASE_URL} is allowed.`,
+      `Refused JWT issuer "${iss}". Only ${describeAllowedSupabaseProjects()} are allowed.`,
       'wrong_project'
     );
   }
@@ -105,7 +85,7 @@ async function verifyWithJwtSecret(token, env) {
     return null;
   }
   const { payload } = await jwtVerify(token, new TextEncoder().encode(secret), {
-    issuer: ALLOWED_JWT_ISSUER,
+    issuer: [...ALLOWED_JWT_ISSUERS],
   });
   return payload;
 }
@@ -165,7 +145,7 @@ export async function verifySupabaseAccessToken(token, { env = process.env, veri
     throw unauthorized(`Invalid or expired access token: ${err.message}`, 'invalid_token');
   }
 
-  assertJwtIssuer(payload.iss);
+  const project = assertJwtIssuer(payload.iss);
   assertUserRole(payload.role);
 
   if (!audienceAllowsAuthenticated(payload.aud)) {
@@ -180,7 +160,7 @@ export async function verifySupabaseAccessToken(token, { env = process.env, veri
   return Object.freeze({
     userId,
     claims: payload,
-    issuer: ALLOWED_JWT_ISSUER,
+    issuer: project.jwtIssuer,
   });
 }
 

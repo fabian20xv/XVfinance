@@ -76,4 +76,17 @@ describe('CA-2.1 JWT verification', () => {
     assert.equal(result.issuer, ALLOWED_JWT_ISSUER);
     assert.equal(decodeJwtPayload(token).iss, ALLOWED_JWT_ISSUER);
   });
+
+  it('accepts a user JWT issued by the develop/staging project', async () => {
+    const developIssuer = 'https://bkwhqfkosxnoffpsjcug.supabase.co/auth/v1';
+    const token = await mint({ issuer: developIssuer });
+    const result = await verifySupabaseAccessToken(token, {
+      env: {
+        SUPABASE_URL: 'https://bkwhqfkosxnoffpsjcug.supabase.co',
+        SUPABASE_JWT_SECRET: SECRET,
+      },
+    });
+    assert.equal(result.userId, USER_ID);
+    assert.equal(result.issuer, developIssuer);
+  });
 });

@@ -131,7 +131,7 @@ describe('CA-4 proposal pipeline + dual confirm', () => {
       requires_role: 'manager',
       preview: { title: 'Holding changes', diff: [{ op: 'upsert' }] },
       payload: { portfolio_id: SMOKE_PORTFOLIO_ID },
-      expires_at: '2026-09-19T00:00:00.000Z',
+      expires_at: '2099-01-01T00:00:00.000Z',
       idempotency_key: 'smoke-holding-changes',
     };
     const card = confirmCard(proposal);

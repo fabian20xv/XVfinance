@@ -1,6 +1,6 @@
 /**
  * Browser / client-bundle public config.
- * Only the locked project URL and the anon/publishable key may appear here.
+ * Only an allowlisted project URL and the anon/publishable key may appear here.
  */
 import { ALLOWED_SUPABASE_URL, assertAllowedSupabaseUrl } from '../config/supabase-lock.js';
 import { assertNoServiceRoleEnv, createChatToolEnv } from '../security/service-role-guard.js';
@@ -13,10 +13,10 @@ export function getPublicSupabaseConfig(env = {}) {
   assertNoServiceRoleEnv(publicEnv);
 
   const url = publicEnv.SUPABASE_URL ?? ALLOWED_SUPABASE_URL;
-  assertAllowedSupabaseUrl(url);
+  const locked = assertAllowedSupabaseUrl(url);
 
   return Object.freeze({
-    url: ALLOWED_SUPABASE_URL,
+    url: locked.url,
     anonKey: publicEnv.SUPABASE_ANON_KEY ?? publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   });
 }
