@@ -1,6 +1,8 @@
 -- XVfinance — proposal confirm/reject lifecycle audit (fail-closed)
--- Target ONLY https://krcwpupbdizzjyydzaqp.supabase.co (ref krcwpupbdizzjyydzaqp)
--- Never apply this migration to any other Supabase project.
+-- Apply on the E0 allowlist only (both refs; refuse any third project):
+--   1. Develop/staging (Tess Preview): https://bkwhqfkosxnoffpsjcug.supabase.co (ref bkwhqfkosxnoffpsjcug)
+--   2. Parent/prod:                    https://krcwpupbdizzjyydzaqp.supabase.co (ref krcwpupbdizzjyydzaqp)
+-- Not parent-only. Tess A→G on develop Preview needs this fail-closed trigger.
 --
 -- BUG-2: confirm/reject used to UPDATE proposals (apply in BEFORE trigger) and
 -- then write audit_events in a second HTTP step. If that insert failed, clients

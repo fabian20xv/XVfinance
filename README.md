@@ -103,7 +103,7 @@ If develop is behind main, **schema migrations must be applied to develop** befo
 
 ## Schema + RLS (E1)
 
-Migrations live in `supabase/migrations/` and may be applied **only** to https://krcwpupbdizzjyydzaqp.supabase.co. Do not `supabase link`, migrate, or seed any other project.
+E1–E9 schema migrations live in `supabase/migrations/` and stay pinned to https://krcwpupbdizzjyydzaqp.supabase.co. Exception: `20260920210000_proposal_lifecycle_audit.sql` may also be applied to develop https://bkwhqfkosxnoffpsjcug.supabase.co (Tess Preview). Refuse any third project. Do not `supabase link` or seed a non-allowlisted project.
 
 | Ticket | What shipped |
 | --- | --- |
@@ -165,7 +165,7 @@ Mutations to clients/contacts/holdings/notes/watchlists stay blocked for `authen
 | Ticket | What shipped |
 | --- | --- |
 | CA-4.1 | Proposals API: `pending` / `confirmed` / `rejected` / `expired` (+ `preview`, `expires_at`, `idempotency_key`) |
-| CA-4.2 | `confirm_proposal` / `reject_proposal` with `requires_role` (`any_member` \| `manager`); apply as confirmer. Lifecycle `audit_events` (`proposal.applied` / `proposal.rejected` / …) are inserted in the same transaction as the status/apply; audit insert failure rolls back the mutate. |
+| CA-4.2 | `confirm_proposal` / `reject_proposal` with `requires_role` (`any_member` \| `manager`); apply as confirmer. Lifecycle `audit_events` (`proposal.applied` / `proposal.rejected` / …) are inserted in the same transaction as the status/apply; audit insert failure rolls back the mutate. `20260920210000_proposal_lifecycle_audit.sql` may be applied to **both** E0 refs (develop `bkwhqfkosxnoffpsjcug` for Preview/Tess, parent `krcwpupbdizzjyydzaqp` for prod). Refuse any third project. |
 | CA-4.3 | Chat confirm card contract `ui: chat.confirm_card` |
 | CA-4.4 | Workspace diff/confirm panel `ui: workspace.diff_confirm_panel` — **same `proposal_id`** |
 | CA-4.5 | `propose_holding_changes`, `propose_client_upsert`, `propose_contact_upsert` |

@@ -68,6 +68,8 @@ SUPABASE_JWT_SECRET=<develop>
 
 This seed **reuses** the E1–E9 files in `supabase/migrations/` (`firms`, `firm_members`, clients, portfolios, holdings, notes, watchlists, proposals, reports, `audit_events`, …). It does not add product tables.
 
+`20260920210000_proposal_lifecycle_audit.sql` is **not parent-only**: apply it on develop `bkwhqfkosxnoffpsjcug` (Preview/Tess) and on parent `krcwpupbdizzjyydzaqp` (prod). Refuse any other Supabase ref. Tess A→G needs this fail-closed trigger on develop.
+
 If develop is behind main, **schema migrations must be applied to develop** before `seed:tess`. The seed fails with `Develop schema is behind main` when `firms` / `reports` / `audit_events` are missing.
 
 Do **not** run `npm run seed` (parent `run_dev_seed`) against develop. Do **not** run `npm run seed:tess` against parent. Do **not** `supabase link` / `db push` parent `krcwpupbdizzjyydzaqp` for this Tess path.

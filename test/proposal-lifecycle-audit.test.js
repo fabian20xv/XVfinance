@@ -22,10 +22,16 @@ const session = {
 };
 
 describe('BUG-2 proposal confirm/reject fail-closed audit', () => {
-  it('pins the lifecycle audit migration to the parent project', () => {
+  it('allowlists the lifecycle audit migration on develop and parent (not parent-only)', () => {
+    assert.match(migration, /bkwhqfkosxnoffpsjcug/);
+    assert.match(migration, /https:\/\/bkwhqfkosxnoffpsjcug\.supabase\.co/);
     assert.match(migration, /krcwpupbdizzjyydzaqp/);
     assert.match(migration, /https:\/\/krcwpupbdizzjyydzaqp\.supabase\.co/);
-    assert.match(migration, /Never apply this migration to any other Supabase project/);
+    assert.match(migration, /Apply on the E0 allowlist only/);
+    assert.match(migration, /refuse any third project/);
+    assert.match(migration, /Not parent-only/);
+    assert.doesNotMatch(migration, /Target ONLY https:\/\/krcwpupbdizzjyydzaqp/);
+    assert.doesNotMatch(migration, /Never apply this migration to any other Supabase project/);
   });
 
   it('writes lifecycle audit_events in the same transaction as confirm/reject apply', () => {
