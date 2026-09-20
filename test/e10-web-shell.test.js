@@ -42,7 +42,6 @@ describe('E10 Dana v1.2 split-screen shell', () => {
     assert.equal(TOKENS.danger, '#B42318');
     assert.equal(TOKENS.success, '#067647');
     assert.equal(TOKENS.draftVeil, 'rgba(244,241,232,0.72)');
-    assert.equal(TOKENS.veilTint, 'rgba(15,110,106,0.12)');
     assert.equal(TOKENS.scratchMark, '#9A8F7A');
     assert.equal(TOKENS.scratchMarkAlpha, 0.1);
     assert.equal(CHROME.topBarPx, 48);
@@ -285,7 +284,11 @@ describe('E10 Dana v1.2 split-screen shell', () => {
     assert.match(css, /#0f6e6a/i);
     assert.equal(css.includes('#0D9488'), false);
     assert.match(css, /--chrome-height: 48px/);
-    assert.match(css, /--veil-tint/);
+    assert.match(css, /--draft-veil: rgba\(244, 241, 232, 0\.72\)/);
+    assert.match(css, /\.draft-veil[\s\S]*background: var\(--draft-veil\)/);
+    assert.equal(css.includes('--veil-tint'), false);
+    assert.equal(css.includes('#fafaf8'), false);
+    assert.equal(css.includes('#1a1a1a'), false);
     assert.match(css, /confirm-inhale/);
     assert.match(css, /ease-out/);
     assert.match(css, /amber-pulse-once/);

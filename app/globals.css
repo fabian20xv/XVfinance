@@ -29,7 +29,6 @@
   --danger: #b42318;
   --success: #067647;
   --draft-veil: rgba(244, 241, 232, 0.72);
-  --veil-tint: rgba(15, 110, 106, 0.12);
   --scratch-mark: #9a8f7a;
   --radius: 10px;
   --chrome-height: 48px;
@@ -145,8 +144,8 @@ body {
 .draft-veil {
   position: absolute;
   inset: 0;
-  /* Rio cool-tint ~12% on the right pane. Locked accent wins over the sketch teal. */
-  background: var(--veil-tint);
+  /* Locked Dana overlay on the right pane only — not a tab. */
+  background: var(--draft-veil);
   z-index: 5;
   display: flex;
   flex-direction: column;

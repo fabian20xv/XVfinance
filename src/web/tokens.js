@@ -19,8 +19,6 @@ export const TOKENS = Object.freeze({
   danger: '#B42318',
   success: '#067647',
   draftVeil: 'rgba(244,241,232,0.72)',
-  /** Cool-tint overlay: locked accent #0F6E6A at ~12%, not sketch #0D9488. */
-  veilTint: 'rgba(15,110,106,0.12)',
   scratchMark: '#9A8F7A',
   scratchMarkAlpha: 0.1,
 });
