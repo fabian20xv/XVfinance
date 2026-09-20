@@ -11,19 +11,51 @@ Additive Tess/Maestro path. It does **not** change E0 app-runtime locks: `boot()
 
 Never write Tess/QA fixtures into the parent project. `npm run seed` (parent smoke fixture) is a different command and stays pinned to parent.
 
-## Required env vars (develop project)
+## Preview / staging env (develop ONLY)
 
-Copy `.env.example` and point these at **develop**, not parent:
+Vercel Preview and Tess staging use the **develop** project only. Never set parent `krcwpupbdizzjyydzaqp` on Preview.
+
+| Var | Preview / staging value |
+| --- | --- |
+| `SUPABASE_URL` | `https://bkwhqfkosxnoffpsjcug.supabase.co` (ref `bkwhqfkosxnoffpsjcug`) |
+| `SUPABASE_ANON_KEY` | develop anon / publishable key |
+| `APP_ENV` | `staging` |
+| `SMOKE_SECRET` | shared with Tess (`x-smoke-secret` on `POST /api/smoke`) |
+| `SUPABASE_SERVICE_ROLE_KEY` | develop service-role, **server-only** — seeds and Node API, never chat tools or clients |
+| `SUPABASE_JWT_SECRET` | develop JWT secret **if** the HS256 verify path is used |
+
+```bash
+SUPABASE_URL=https://bkwhqfkosxnoffpsjcug.supabase.co
+SUPABASE_ANON_KEY=<develop anon>
+APP_ENV=staging
+SMOKE_SECRET=<shared with Tess>
+SUPABASE_SERVICE_ROLE_KEY=<develop, server-only>
+# If JWT verify path is used:
+SUPABASE_JWT_SECRET=<develop>
+```
+
+`APP_ENV` / `VERCEL_ENV` must **not** be `production` (develop ref is refused in production; Tess smoke is `403`).
+
+## Required env vars for `seed:tess`
+
+Same develop URL and **develop** service-role as Preview. Copy `.env.example` and point these at develop, not parent:
 
 ```bash
 # Must be exactly this URL. Parent is refused.
 SUPABASE_URL=https://bkwhqfkosxnoffpsjcug.supabase.co
+APP_ENV=staging
 
-# Server-only. Used by scripts/seed-tess-develop.js. Never expose to chat tools, the model, or clients.
-SUPABASE_SERVICE_ROLE_KEY=replace-with-develop-service-role-key
+# Server-only. Used by scripts/seed-tess-develop.js and the Node API. Never expose to chat tools, the model, or clients.
+SUPABASE_SERVICE_ROLE_KEY=<develop, server-only>
 
-# Develop anon / publishable key (user-JWT RLS after seed; not used to write fixtures).
-SUPABASE_ANON_KEY=replace-with-develop-anon-or-publishable-key
+# Develop anon / publishable key (user-JWT RLS after seed; Tess Preview clients).
+SUPABASE_ANON_KEY=<develop anon>
+
+# Shared with Tess for POST /api/smoke (Preview/staging only).
+SMOKE_SECRET=<shared with Tess>
+
+# If the API verifies user JWTs with HS256 (optional if Auth /user check is used).
+SUPABASE_JWT_SECRET=<develop>
 
 # Optional. Defaults to the documented Tess QA password in src/db/tess-ids.js
 # TESS_QA_PASSWORD=TessQa.Develop.Only.2026!
@@ -31,8 +63,6 @@ SUPABASE_ANON_KEY=replace-with-develop-anon-or-publishable-key
 # Optional dry-run (no writes, no service-role required)
 # TESS_SEED_DRY_RUN=1
 ```
-
-`APP_ENV` / `VERCEL_ENV` must **not** be `production`.
 
 ## Commands
 

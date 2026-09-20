@@ -287,7 +287,12 @@ describe('Tess develop seed docs', () => {
     }
     assert.match(docs, /SUPABASE_SERVICE_ROLE_KEY/);
     assert.match(docs, /SUPABASE_ANON_KEY/);
+    assert.match(docs, /APP_ENV=staging/);
+    assert.match(docs, /SMOKE_SECRET/);
+    assert.match(docs, /SUPABASE_JWT_SECRET/);
+    assert.match(docs, /Never set parent `?krcwpupbdizzjyydzaqp`? on Preview/);
     assert.match(docs, /schema migrations must be applied to develop/i);
     assert.doesNotMatch(docs, /eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/);
+    assert.match(readme, /Never parent `?krcwpupbdizzjyydzaqp`? on Preview/);
   });
 });

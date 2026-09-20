@@ -3,6 +3,10 @@
  * Tess QA fixture seed for the develop Supabase project only.
  * Refuses parent/prod (krcwpupbdizzjyydzaqp). Service-role stays server-side.
  *
+ * Preview/staging env is develop ONLY (never parent krcwpupbdizzjyydzaqp):
+ *   SUPABASE_URL=https://bkwhqfkosxnoffpsjcug.supabase.co
+ *   APP_ENV=staging
+ *
  * Usage:
  *   SUPABASE_URL=https://bkwhqfkosxnoffpsjcug.supabase.co npm run seed:tess
  *   npm run seed:tess -- --dry-run

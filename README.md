@@ -95,7 +95,7 @@ Additive Maestro/Tess path. App runtime on parent is unchanged: `boot()` still a
 
 Preview/staging uses develop **only** (`SUPABASE_URL=https://bkwhqfkosxnoffpsjcug.supabase.co`, `APP_ENV=staging`, develop `SUPABASE_ANON_KEY`, `SMOKE_SECRET` shared with Tess, develop server-only `SUPABASE_SERVICE_ROLE_KEY`, develop `SUPABASE_JWT_SECRET` if JWT verify is used). Never parent `krcwpupbdizzjyydzaqp` on Preview.
 
-Exact steps to apply schema to develop (if behind) and run `seed:tess`: [`docs/tess-develop-seed.md`](docs/tess-develop-seed.md).
+Exact migrate + `seed:tess` steps, env table, inventory, and logins: [`docs/tess-develop-seed.md`](docs/tess-develop-seed.md).
 
 If develop is behind main, **schema migrations must be applied to develop** before seed. This seed reuses existing `firms` / `firm_members` / domain tables; it does not add a product schema.
 
