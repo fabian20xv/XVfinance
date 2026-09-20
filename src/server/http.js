@@ -1,13 +1,16 @@
 /**
- * Node HTTP API: JWT session + tool router + audit writer + proposals.
+ * Node HTTP API: JWT session + tool router + audit writer + proposals + Tess health/smoke.
  */
 import { createServer } from 'node:http';
-import { ALLOWED_SUPABASE_PROJECT_REF, ALLOWED_SUPABASE_URL } from '../config/supabase-lock.js';
+import { createUserScopedClient } from '../chat/user-client.js';
+import { boot } from '../config/startup.js';
+import { isProductionEnv, resolveAppEnv, resolveCommitSha } from '../config/runtime-env.js';
 import { dispatchTool } from '../chat/tool-router.js';
 import { writeAuditEvent } from './audit.js';
 import { ApiError } from './errors.js';
 import { bearerTokenFromHeader, verifySupabaseAccessToken } from './jwt.js';
 import { attachFirmContext } from './session.js';
+import { authorizeSmokeRequest, runSmoke } from './smoke.js';
 
 const UUID = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
 const PROPOSAL_PATH = new RegExp(
@@ -109,12 +112,15 @@ async function runTool(req, res, deps, name, args) {
  * @param {object} [options]
  */
 export function createRequestListener({ env = process.env, deps = {} } = {}) {
+  const locked = deps.locked ?? boot(env);
   const resolved = {
     env,
+    locked,
     verifyToken: deps.verifyToken ?? verifySupabaseAccessToken,
     attachSession: deps.attachSession ?? attachFirmContext,
     dispatch: deps.dispatch ?? dispatchTool,
     writeAudit: deps.writeAudit ?? writeAuditEvent,
+    createUserClient: deps.createUserClient ?? createUserScopedClient,
   };
 
   return async function listener(req, res) {
@@ -122,13 +128,52 @@ export function createRequestListener({ env = process.env, deps = {} } = {}) {
       const url = new URL(req.url ?? '/', 'http://127.0.0.1');
       const path = url.pathname.replace(/\/+$/, '') || '/';
 
+      if (req.method === 'GET' && path === '/api/health') {
+        send(res, 200, {
+          ok: true,
+          commit: resolveCommitSha(resolved.env),
+          env: resolveAppEnv(resolved.env),
+          supabaseRef: resolved.locked.ref,
+        });
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/smoke') {
+        for await (const chunk of req) {
+          void chunk;
+        }
+
+        if (isProductionEnv(resolved.env)) {
+          send(res, 403, { ok: false, error: 'smoke is disabled in production' });
+          return;
+        }
+
+        const auth = authorizeSmokeRequest(req, resolved.env);
+        if (!auth.ok) {
+          send(res, auth.status, { ok: false, error: auth.error });
+          return;
+        }
+
+        const result = await runSmoke({
+          env: resolved.env,
+          createUserClient: resolved.createUserClient,
+        });
+        send(res, result.ok ? 200 : 503, {
+          ok: result.ok,
+          env: resolveAppEnv(resolved.env),
+          supabaseRef: result.supabaseRef ?? resolved.locked.ref,
+          steps: result.steps,
+        });
+        return;
+      }
+
       if (req.method === 'GET' && path === '/health') {
         send(res, 200, {
           ok: true,
           data: {
             status: 'ok',
-            project_ref: ALLOWED_SUPABASE_PROJECT_REF,
-            supabase_url: ALLOWED_SUPABASE_URL,
+            project_ref: resolved.locked.ref,
+            supabase_url: resolved.locked.url,
           },
         });
         return;
