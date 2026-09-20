@@ -68,6 +68,19 @@ Steps (each returns `ok`, `ms`, and skip/error detail):
 
 Overall `200` when every step is ok (skipped counts as ok); `503` if a step fails.
 
+### Vercel Preview vs local `--serve`
+
+Same listener (`createRequestListener` in `src/server/http.js`). Different process wrappers:
+
+| | Local | Vercel Preview / Production |
+| --- | --- | --- |
+| How it starts | `npm start` → `node src/index.js --serve` | Vercel invokes the Function at `api/index.js` (and `api/[...path].js` so `/api/health` is not a missing-file 404) |
+| Process | Long-lived `node:http` server, `PORT` default `8787` | One serverless invocation per request (Fluid Compute). No `node src/index.js --serve` |
+| Routing | `req.url` is the public path | `vercel.json` sends `/api/health`, `/api/smoke`, `/health`, and `/v1/*` to that Function. Non-`/api` paths are rewritten with `xv_path` so the listener still matches `/health` and `/v1/*` |
+| Allowlist | `boot()` on process start | `boot()` on Function init (same `SUPABASE_URL` allowlist; develop ref refused when `VERCEL_ENV`/`APP_ENV` is production) |
+
+Do not run `--serve` on Vercel. Keep Preview env `SUPABASE_URL` on the parent or develop ref only.
+
 ## Schema + RLS (E1)
 
 Migrations live in `supabase/migrations/` and may be applied **only** to https://krcwpupbdizzjyydzaqp.supabase.co. Do not `supabase link`, migrate, or seed any other project.
@@ -94,6 +107,7 @@ The API verifies **user** JWTs issued by the locked project, attaches `firm_memb
 
 ```bash
 npm start   # node src/index.js --serve  (requires SUPABASE_URL; PORT default 8787)
+# Vercel Preview invokes api/index.js (same createRequestListener; see vercel.json)
 # GET  /api/health      — Tess liveness { ok, commit, env, supabaseRef }; no JWT
 # POST /api/smoke       — Tess staging probe; header x-smoke-secret; 403 in production
 # GET  /health          — no JWT
