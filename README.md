@@ -54,7 +54,9 @@ Unauthenticated liveness. Always `200` after a successful boot:
 
 - `commit` — `VERCEL_GIT_COMMIT_SHA`, else `GIT_COMMIT`, else `unknown`
 - `env` — `APP_ENV`, else `VERCEL_ENV`, else `development`
-- `supabaseRef` — the locked project ref from `SUPABASE_URL`
+- `supabaseRef` — the locked project ref from `SUPABASE_URL` (runtime lock; parent or develop)
+
+`POST /v1/tools` `{ "name": "health" }` uses the **same** `SUPABASE_URL` lock. It must not echo parent ref `krcwpupbdizzjyydzaqp` when Preview/staging is locked to develop.
 
 ### `POST /api/smoke`
 
@@ -121,7 +123,7 @@ The API verifies **user** JWTs issued by the locked project, attaches `firm_memb
 | --- | --- |
 | CA-2.1 | `verifySupabaseAccessToken` accepts user JWTs from the parent or develop issuer. HS256 uses `SUPABASE_JWT_SECRET`; ES256/RS256 (develop JWKS) uses `createRemoteJWKSet` at `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`. Jose key-type/alg mismatches fall through to Auth `GET /auth/v1/user`. `attachFirmContext` loads `user_id`, `firm_id`, `role` (`manager`\|`analyst`). Missing / wrong-project / service-role tokens fail loud |
 | CA-2.2 | `POST /v1/tools` allowlist + JSON Schema; user JWT client; responses `{ ok, data\|error, audit_id? }` |
-| CA-2.3 | `writeAuditEvent` inserts firm-scoped `audit_events` (service-role, server-only) for sensitive reads and proposal lifecycle action names |
+| CA-2.3 | `writeAuditEvent` inserts firm-scoped `audit_events` (service-role, server-only) for sensitive reads and proposal lifecycle action names. Confirm/reject lifecycle rows are also written in the same DB transaction as apply (fail-closed). If the HTTP writer fails after a committed confirm/reject, the API still returns **200** with the applied/rejected result — never 500. `POST /v1/tools` `health` reports the **runtime** locked ref from `SUPABASE_URL` (same source as `GET /api/health`), not the parent constant. |
 
 ```bash
 npm start   # node src/index.js --serve  (requires SUPABASE_URL; PORT default 8787)
@@ -130,7 +132,7 @@ npm start   # node src/index.js --serve  (requires SUPABASE_URL; PORT default 87
 # POST /api/smoke       — Tess staging probe; header x-smoke-secret; 403 in production
 # GET  /health          — no JWT
 # GET  /v1/session      — Authorization: Bearer <user jwt>
-# POST /v1/tools        — { "name": "get_session", "args": {} }
+# POST /v1/tools        — { "name": "get_session"|"health", "args": {} }
 # GET  /v1/proposals
 # GET  /v1/proposals/:id
 # GET  /v1/proposals/:id/confirm-card
@@ -163,7 +165,7 @@ Mutations to clients/contacts/holdings/notes/watchlists stay blocked for `authen
 | Ticket | What shipped |
 | --- | --- |
 | CA-4.1 | Proposals API: `pending` / `confirmed` / `rejected` / `expired` (+ `preview`, `expires_at`, `idempotency_key`) |
-| CA-4.2 | `confirm_proposal` / `reject_proposal` with `requires_role` (`any_member` \| `manager`); apply as confirmer |
+| CA-4.2 | `confirm_proposal` / `reject_proposal` with `requires_role` (`any_member` \| `manager`); apply as confirmer. Lifecycle `audit_events` (`proposal.applied` / `proposal.rejected` / …) are inserted in the same transaction as the status/apply; audit insert failure rolls back the mutate. |
 | CA-4.3 | Chat confirm card contract `ui: chat.confirm_card` |
 | CA-4.4 | Workspace diff/confirm panel `ui: workspace.diff_confirm_panel` — **same `proposal_id`** |
 | CA-4.5 | `propose_holding_changes`, `propose_client_upsert`, `propose_contact_upsert` |

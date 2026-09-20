@@ -8,6 +8,7 @@ import { isProductionEnv, resolveAppEnv, resolveCommitSha } from '../config/runt
 import { dispatchTool } from '../chat/tool-router.js';
 import { writeAuditEvent } from './audit.js';
 import { ApiError } from './errors.js';
+import { completeToolSuccess } from './tool-response.js';
 import { bearerTokenFromHeader, verifySupabaseAccessToken } from './jwt.js';
 import { attachFirmContext } from './session.js';
 import { authorizeSmokeRequest, runSmoke } from './smoke.js';
@@ -315,25 +316,13 @@ async function finishTool(res, result, session, deps) {
     return;
   }
 
-  let auditId;
-  if (result.audit?.action) {
-    auditId = await deps.writeAudit({
-      env: deps.env,
-      firmId: session.firmId,
-      actorId: session.userId,
-      action: result.audit.action,
-      entityTable: result.audit.entityTable,
-      entityId: result.audit.entityId ?? session.userId,
-      payload: {
-        tool: result.audit.action,
-        role: session.role,
-        entity_id: result.audit.entityId ?? null,
-        sensitive: Boolean(result.audit.sensitive),
-      },
-    });
-  }
-
-  send(res, 200, { ok: true, data: result.data, ...(auditId ? { audit_id: auditId } : {}) });
+  const completed = await completeToolSuccess({
+    result,
+    session,
+    writeAudit: deps.writeAudit,
+    env: deps.env,
+  });
+  send(res, completed.status, completed.body);
 }
 
 /**

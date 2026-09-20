@@ -478,6 +478,110 @@ describe('CA-2 HTTP API', () => {
     );
   });
 
+  it('POST /v1/tools health reports the runtime locked ref, not the parent constant', async (t) => {
+    const token = await mint();
+    await withServer(
+      t,
+      {
+        env: { SUPABASE_URL: DEVELOP_URL, APP_ENV: 'staging' },
+        deps: sessionDeps,
+      },
+      async (port) => {
+        const res = await fetch(`http://127.0.0.1:${port}/v1/tools`, {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${token}`,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({ name: 'health', args: {} }),
+        });
+        const body = await res.json();
+        assert.equal(res.status, 200);
+        assert.equal(body.ok, true);
+        assert.equal(body.data.project_ref, DEVELOP_REF);
+        assert.equal(body.data.supabase_url, DEVELOP_URL);
+        assert.notEqual(body.data.project_ref, PARENT_REF);
+      }
+    );
+  });
+
+  it('POST /v1/proposals/:id/confirm returns 200 when mutate succeeded but audit write fails', async (t) => {
+    const token = await mint();
+    await withServer(
+      t,
+      {
+        deps: {
+          ...sessionDeps,
+          writeAudit: async () => {
+            throw new Error('audit write failed: SUPABASE_SERVICE_ROLE_KEY is missing');
+          },
+          dispatch: async ({ name, args }) => {
+            assert.equal(name, 'confirm_proposal');
+            return {
+              ok: true,
+              data: { id: args.proposal_id, status: 'confirmed', db_status: 'applied' },
+              audit: {
+                action: 'proposal.applied',
+                entityTable: 'proposals',
+                entityId: args.proposal_id,
+                sensitive: true,
+              },
+            };
+          },
+        },
+      },
+      async (port) => {
+        const res = await fetch(`http://127.0.0.1:${port}/v1/proposals/${SMOKE_FIRM_ID}/confirm`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${token}` },
+        });
+        const body = await res.json();
+        assert.equal(res.status, 200);
+        assert.equal(body.ok, true);
+        assert.equal(body.data.db_status, 'applied');
+        assert.equal(body.audit_id, undefined);
+      }
+    );
+  });
+
+  it('POST /v1/proposals/:id/reject returns 200 when mutate succeeded but audit write fails', async (t) => {
+    const token = await mint();
+    await withServer(
+      t,
+      {
+        deps: {
+          ...sessionDeps,
+          writeAudit: async () => {
+            throw new Error('audit write failed: missing id');
+          },
+          dispatch: async ({ name, args }) => {
+            assert.equal(name, 'reject_proposal');
+            return {
+              ok: true,
+              data: { id: args.proposal_id, status: 'rejected', db_status: 'rejected' },
+              audit: {
+                action: 'proposal.rejected',
+                entityTable: 'proposals',
+                entityId: args.proposal_id,
+                sensitive: true,
+              },
+            };
+          },
+        },
+      },
+      async (port) => {
+        const res = await fetch(`http://127.0.0.1:${port}/v1/proposals/${SMOKE_FIRM_ID}/reject`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${token}` },
+        });
+        const body = await res.json();
+        assert.equal(res.status, 200);
+        assert.equal(body.ok, true);
+        assert.equal(body.data.status, 'rejected');
+      }
+    );
+  });
+
   it('POST /v1/proposals/:id/confirm dispatches confirm_proposal', async (t) => {
     const token = await mint();
     await withServer(
