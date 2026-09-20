@@ -31,6 +31,7 @@ class Query {
     this.offsetN = 0;
     this.limitN = null;
     this.prefer = null;
+    this.onConflict = 'id';
   }
 
   select(columns) {
@@ -41,6 +42,13 @@ class Query {
   insert(row) {
     this.op = 'insert';
     this.payload = row;
+    return this;
+  }
+
+  upsert(row, options = {}) {
+    this.op = 'upsert';
+    this.payload = row;
+    this.onConflict = options.onConflict || 'id';
     return this;
   }
 
@@ -110,6 +118,26 @@ class Query {
         return full;
       });
       rows = inserted;
+    } else if (this.op === 'upsert') {
+      const list = Array.isArray(this.payload) ? this.payload : [this.payload];
+      const keys = String(this.onConflict || 'id')
+        .split(',')
+        .map((part) => part.trim())
+        .filter(Boolean);
+      const upserted = list.map((row) => {
+        const idx = this.db[this.table].findIndex((existing) =>
+          keys.every((key) => existing[key] === row[key])
+        );
+        if (idx >= 0) {
+          const next = { ...this.db[this.table][idx], ...row };
+          this.db[this.table][idx] = next;
+          return next;
+        }
+        const full = { id: row.id ?? randomUUID(), ...row };
+        this.db[this.table].push(full);
+        return full;
+      });
+      rows = upserted;
     } else if (this.op === 'update') {
       const updated = [];
       this.db[this.table] = this.db[this.table].map((row) => {

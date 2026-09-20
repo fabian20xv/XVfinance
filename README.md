@@ -26,7 +26,7 @@ This repo may talk to **two** Supabase projects (parent/prod and develop/staging
 - **Parent/prod URL:** https://krcwpupbdizzjyydzaqp.supabase.co — ref `krcwpupbdizzjyydzaqp`
 - **Develop/staging URL:** https://bkwhqfkosxnoffpsjcug.supabase.co — ref `bkwhqfkosxnoffpsjcug` (staging-only)
 
-Any other host, origin, or ref (including other `*.supabase.co` projects) is refused. A third ref fails with the same loud `Refused Supabase project ref` error as a missing URL. Schema migrations and `npm run seed` stay pinned to the parent/prod project.
+Any other host, origin, or ref (including other `*.supabase.co` projects) is refused. A third ref fails with the same loud `Refused Supabase project ref` error as a missing URL. Schema migrations and `npm run seed` stay pinned to the parent/prod project. Tess QA fixtures are an additive develop-only path (`npm run seed:tess`) and **refuse** parent ref `krcwpupbdizzjyydzaqp`.
 
 ## Service-role isolation (CA-0.2)
 
@@ -79,7 +79,25 @@ Same listener (`createRequestListener` in `src/server/http.js`). Different proce
 | Routing | `req.url` is the public path | `vercel.json` sends `/api/health`, `/api/smoke`, `/health`, and `/v1/*` to that Function. Non-`/api` paths are rewritten with `xv_path` so the listener still matches `/health` and `/v1/*` |
 | Allowlist | `boot()` on process start | `boot()` on Function init (same `SUPABASE_URL` allowlist; develop ref refused when `VERCEL_ENV`/`APP_ENV` is production) |
 
-Do not run `--serve` on Vercel. Keep Preview env `SUPABASE_URL` on the parent or develop ref only.
+Do not run `--serve` on Vercel. Preview/staging `SUPABASE_URL` must be develop only (`bkwhqfkosxnoffpsjcug`). Never parent `krcwpupbdizzjyydzaqp` on Preview.
+
+## Tess develop seed (QA fixtures)
+
+Additive Maestro/Tess path. App runtime on parent is unchanged: `boot()` still allows `krcwpupbdizzjyydzaqp`, and `npm run seed` still calls parent `run_dev_seed`.
+
+| Command | Target | Writes Tess fixtures? |
+| --- | --- | --- |
+| `npm run seed` | Parent/prod only | No (product smoke firm) |
+| `npm run seed:tess` | **Develop only** `bkwhqfkosxnoffpsjcug` | Yes |
+| `npm run seed:tess -- --dry-run` | Asserts develop URL; no writes | No |
+
+`scripts/seed-tess-develop.js` asserts `SUPABASE_URL` is exactly https://bkwhqfkosxnoffpsjcug.supabase.co and **fails loud** if it is parent https://krcwpupbdizzjyydzaqp.supabase.co (or any other ref). Never seed Tess/QA data into the parent project. Service-role is used only inside `src/server/tess-seed.js` (never chat tools).
+
+Preview/staging uses develop **only** (`SUPABASE_URL=https://bkwhqfkosxnoffpsjcug.supabase.co`, `APP_ENV=staging`, develop `SUPABASE_ANON_KEY`, `SMOKE_SECRET` shared with Tess, develop server-only `SUPABASE_SERVICE_ROLE_KEY`, develop `SUPABASE_JWT_SECRET` if JWT verify is used). Never parent `krcwpupbdizzjyydzaqp` on Preview.
+
+Exact migrate + `seed:tess` steps, env table, inventory, and logins: [`docs/tess-develop-seed.md`](docs/tess-develop-seed.md).
+
+If develop is behind main, **schema migrations must be applied to develop** before seed. This seed reuses existing `firms` / `firm_members` / domain tables; it does not add a product schema.
 
 ## Schema + RLS (E1)
 
@@ -207,7 +225,9 @@ cp .env.example .env   # placeholders only; never commit real keys
 npm install
 npm run ci             # lock assert + lint + tests (E0–E9)
 # Server-only, locked project only (requires real SUPABASE_SERVICE_ROLE_KEY):
-npm run seed
+npm run seed                    # parent/prod smoke fixture only
+npm run seed:tess -- --dry-run  # develop URL guard; no writes
+# npm run seed:tess             # develop Tess QA fixtures; refuses parent
 npm run smoke:e1
 npm run smoke:e5e8
 npm run smoke:e9

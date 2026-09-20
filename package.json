@@ -11,6 +11,7 @@
     "start": "node src/index.js --serve",
     "assert:supabase": "node scripts/assert-supabase-lock.js",
     "seed": "node scripts/seed-dev.js",
+    "seed:tess": "node scripts/seed-tess-develop.js",
     "smoke:e1": "node scripts/smoke-e1.js",
     "smoke:e5e8": "node scripts/smoke-e5-e8.js",
     "smoke:e9": "node scripts/smoke-e9.js",
