@@ -162,3 +162,29 @@ export function assertAllowedJwtIssuer(issuer) {
 
   return project;
 }
+
+/**
+ * Tess QA seed lock: fail loud unless SUPABASE_URL is exactly the develop project.
+ * Parent/prod (`krcwpupbdizzjyydzaqp`) is refused — never write Tess fixtures there.
+ * App runtime `boot()` is unchanged and still allows parent.
+ * @param {string} urlString
+ * @returns {{ ref: string, url: string, host: string, role: 'parent' | 'develop', jwtIssuer: string }}
+ */
+export function assertTessDevelopSupabaseUrl(urlString) {
+  const project = assertAllowedSupabaseUrl(urlString);
+  if (project.ref === PARENT_SUPABASE_PROJECT_REF) {
+    fail(
+      `Refused parent/prod Supabase ref "${PARENT_SUPABASE_PROJECT_REF}" ` +
+        `(${PARENT_SUPABASE_PROJECT.url}). Tess QA fixtures may only be written to develop ` +
+        `ref ${DEVELOP_SUPABASE_PROJECT_REF} (${DEVELOP_SUPABASE_PROJECT.url}). ` +
+        `Never seed Tess/QA data into the parent project.`
+    );
+  }
+  if (project.ref !== DEVELOP_SUPABASE_PROJECT_REF) {
+    fail(
+      `Refused Supabase project ref "${project.ref}". Tess QA seed requires exactly ` +
+        `develop ref ${DEVELOP_SUPABASE_PROJECT_REF} (${DEVELOP_SUPABASE_PROJECT.url}).`
+    );
+  }
+  return project;
+}
