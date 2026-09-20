@@ -4,7 +4,6 @@
     { "source": "/api/health", "destination": "/api/health" },
     { "source": "/api/smoke", "destination": "/api/smoke" },
     { "source": "/health", "destination": "/api?xv_path=/health" },
-    { "source": "/v1/:path*", "destination": "/api?xv_path=/v1/:path*" },
-    { "source": "/(.*)", "destination": "/api?xv_path=/$1" }
+    { "source": "/v1/:path*", "destination": "/api?xv_path=/v1/:path*" }
   ]
 }

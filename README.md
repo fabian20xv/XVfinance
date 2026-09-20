@@ -220,12 +220,28 @@ Ghostwrite writes a **draft** meeting 1-pager (via `reports` with `purpose = mee
 | CA-9.2 | Receipts panel `ui: workspace.receipts_panel` (`get_meeting_receipts`); each receipt is firm-scoped and auditable |
 | CA-9.3 | `propose_meeting_send` (manager confirm, channel `email` \| `export`) + `export_meeting_one_pager` (audited; `public_url` always null) |
 
+## Split-screen shell (E10, Dana v1.1)
+
+Next.js App Router UI at `app/` (same repo as the Node `/v1` server). Design pack v1.1 is locked: Inter + system-ui, 56/44 split (drag 48–64, reset → 56), 48px top bar, no nav rail, 8px grid, 10px radius.
+
+| Surface | Wiring |
+| --- | --- |
+| AuthGate | Supabase Auth session only; user JWT is sent as `Authorization: Bearer` to `/v1` |
+| ConfirmCard + DiffConfirmPanel | Same `proposal_id`; `POST /v1/proposals/:id/confirm` / `reject` |
+| Scratchpad | Veil over live workspace (not a tab). `GET /v1/scratchpads/:id/impact`. Promote → `scratchpad_promote` manager dual-confirm. Discard dissolves in 200ms with no source-of-truth persist |
+| Receipts | `workspace.receipts_panel`; `public_url` is always `null`. Email/Export → `propose_meeting_send` |
+| Composer | Stays unlocked while confirm is pending. Dispatches allowlisted `POST /v1/tools` (no invented model chat API) |
+
+Out of scope: CRM, optimizer, news firehose, scenario libraries, dark mode.
+
+Preview/dev web env may use develop ref `bkwhqfkosxnoffpsjcug`. Production must use parent `krcwpupbdizzjyydzaqp`.
+
 ## Setup
 
 ```bash
 cp .env.example .env   # placeholders only; never commit real keys
 npm install
-npm run ci             # lock assert + lint + tests (E0–E9)
+npm run ci             # lock assert + lint + tests (E0–E10)
 # Server-only, locked project only (requires real SUPABASE_SERVICE_ROLE_KEY):
 npm run seed                    # parent/prod smoke fixture only
 npm run seed:tess -- --dry-run  # develop URL guard; no writes
@@ -235,9 +251,23 @@ npm run smoke:e5e8
 npm run smoke:e9
 ```
 
-Start (requires `SUPABASE_URL` in the environment). Without `--serve` the process only runs `boot()` and exits. `npm start` adds `--serve`:
+Start the Node `/v1` API (requires `SUPABASE_URL` in the environment). Without `--serve` the process only runs `boot()` and exits. `npm start` adds `--serve`:
 
 ```bash
 node --env-file=.env src/index.js --serve
 # or: npm start
 ```
+
+The API still listens on `PORT` (default `8787`). It is unchanged: health, smoke, `/v1/session`, `/v1/tools`, proposals, scratchpad impact, meeting receipts.
+
+Start the E10 web shell (App Router). Next.js also serves `/v1`, `/health`, `/api/health`, and `/api/smoke` through the same `createRequestListener`, so `npm run web` is enough for local UI + API. Keep `npm start` when you want the Node listener alone:
+
+```bash
+# Web + API in one Next.js process (http://127.0.0.1:3000)
+npm run web
+
+# Optional: Node API only (http://127.0.0.1:8787)
+npm start
+```
+
+Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (same allowlisted projects as `SUPABASE_URL`). AuthGate signs in with Supabase Auth, then calls `GET /v1/session` with the user JWT.

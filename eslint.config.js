@@ -4,7 +4,7 @@ import xvfinance from './eslint/plugin-xvfinance.js';
 
 export default [
   {
-    ignores: ['node_modules/**', 'coverage/**'],
+    ignores: ['node_modules/**', 'coverage/**', '.next/**', 'out/**'],
   },
   js.configs.recommended,
   {
