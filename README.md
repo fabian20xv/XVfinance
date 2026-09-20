@@ -101,7 +101,7 @@ The API verifies **user** JWTs issued by the locked project, attaches `firm_memb
 
 | Ticket | What shipped |
 | --- | --- |
-| CA-2.1 | `verifySupabaseAccessToken` checks issuer `https://krcwpupbdizzjyydzaqp.supabase.co/auth/v1`; `attachFirmContext` loads `user_id`, `firm_id`, `role` (`manager`\|`analyst`). Missing / wrong-project / service-role tokens fail loud |
+| CA-2.1 | `verifySupabaseAccessToken` accepts user JWTs from the parent or develop issuer. HS256 uses `SUPABASE_JWT_SECRET`; ES256/RS256 (develop JWKS) uses `createRemoteJWKSet` at `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`. Jose key-type/alg mismatches fall through to Auth `GET /auth/v1/user`. `attachFirmContext` loads `user_id`, `firm_id`, `role` (`manager`\|`analyst`). Missing / wrong-project / service-role tokens fail loud |
 | CA-2.2 | `POST /v1/tools` allowlist + JSON Schema; user JWT client; responses `{ ok, data\|error, audit_id? }` |
 | CA-2.3 | `writeAuditEvent` inserts firm-scoped `audit_events` (service-role, server-only) for sensitive reads and proposal lifecycle action names |
 

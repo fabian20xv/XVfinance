@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { describe, it } from 'node:test';
-import { SignJWT } from 'jose';
+import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { ALLOWED_JWT_ISSUER, ALLOWED_SUPABASE_URL } from '../src/config/supabase-lock.js';
 import { SMOKE_FIRM_ID, SMOKE_MANAGER_ID } from '../src/db/smoke-ids.js';
 import { startApiServer } from '../src/server/http.js';
+import { resetRemoteJwksCache } from '../src/server/jwt.js';
 
 const SECRET = 'xvfinance-test-jwt-secret-32chars!';
 const PARENT_URL = 'https://krcwpupbdizzjyydzaqp.supabase.co';
@@ -352,6 +353,70 @@ describe('CA-2 HTTP API', () => {
       assert.equal(body.ok, false);
       assert.equal(body.error.code, 'unauthenticated');
     });
+  });
+
+  it('GET /v1/session accepts a develop ES256 access token via JWKS', async (t) => {
+    const { publicKey, privateKey } = await generateKeyPair('ES256', { extractable: true });
+    const jwk = await exportJWK(publicKey);
+    jwk.kid = 'develop-es256';
+    jwk.alg = 'ES256';
+    jwk.use = 'sig';
+    const token = await new SignJWT({ role: 'authenticated', aud: 'authenticated' })
+      .setProtectedHeader({ alg: 'ES256', kid: jwk.kid, typ: 'JWT' })
+      .setIssuer(`${DEVELOP_URL}/auth/v1`)
+      .setSubject(SMOKE_MANAGER_ID)
+      .setIssuedAt()
+      .setExpirationTime('10m')
+      .sign(privateKey);
+
+    const previousFetch = globalThis.fetch;
+    globalThis.fetch = async (input, init) => {
+      const url = String(input?.url ?? input);
+      if (url === `${DEVELOP_URL}/auth/v1/.well-known/jwks.json`) {
+        return new Response(JSON.stringify({ keys: [jwk] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return previousFetch(input, init);
+    };
+    t.after(() => {
+      globalThis.fetch = previousFetch;
+      resetRemoteJwksCache();
+    });
+
+    await withServer(
+      t,
+      {
+        env: {
+          SUPABASE_URL: DEVELOP_URL,
+          SUPABASE_JWT_SECRET: SECRET,
+          SUPABASE_ANON_KEY: 'anon-key',
+          APP_ENV: 'staging',
+        },
+        deps: {
+          ...sessionDeps,
+          writeAudit: async () => 'audit-es256-session',
+          dispatch: async ({ name, session }) => {
+            assert.equal(name, 'get_session');
+            return {
+              ok: true,
+              data: { user_id: session.userId, firm_id: session.firmId, role: session.role },
+              audit: { action: 'session.read', entityTable: 'firm_members' },
+            };
+          },
+        },
+      },
+      async (port) => {
+        const res = await fetch(`http://127.0.0.1:${port}/v1/session`, {
+          headers: { authorization: `Bearer ${token}` },
+        });
+        const body = await res.json();
+        assert.equal(res.status, 200, JSON.stringify(body));
+        assert.equal(body.ok, true);
+        assert.equal(body.data.user_id, SMOKE_MANAGER_ID);
+      }
+    );
   });
 
   it('GET /v1/proposals/:id/confirm-card and workspace-panel share proposal_id', async (t) => {
