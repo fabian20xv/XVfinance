@@ -1,5 +1,8 @@
 'use client';
 
+/**
+ * Deferred to epic 1.5 — kept in inventory, not mounted in AppShell (Dana v1.2).
+ */
 export function SpeakReadyToggle({
   ready,
   onChange,
@@ -13,7 +16,7 @@ export function SpeakReadyToggle({
       className="btn btn-ghost"
       aria-pressed={ready}
       onClick={() => onChange(!ready)}
-      title="Local speak-ready chrome. No E0–E9 speak API."
+      title="Deferred to epic 1.5. No E0–E9 speak API."
       style={{
         borderColor: ready ? 'var(--amber-pulse)' : 'var(--line)',
         color: ready ? 'var(--amber-pulse)' : 'var(--ink-muted)',

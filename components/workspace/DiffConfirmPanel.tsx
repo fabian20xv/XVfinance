@@ -1,9 +1,9 @@
 'use client';
 
 import { Badge } from '@/components/primitives/Badge';
-import { Button } from '@/components/primitives/Button';
+import { ConfirmActions, type ConfirmOutcome } from '@/components/chat/ConfirmActions';
 import { actionPath, withNullPublicUrl } from '@/src/web/dual-confirm.js';
-import { ReceiptSideSlip } from '@/components/meeting/ReceiptSideSlip';
+import { ReceiptFootnote } from '@/components/meeting/ReceiptFootnote';
 
 export type DiffPanelModel = {
   ui?: string;
@@ -58,7 +58,8 @@ export function DiffConfirmPanel({
   highlighted,
   canConfirm,
   busy,
-  onHover,
+  outcome,
+  onSelect,
   onConfirm,
   onReject,
 }: {
@@ -66,7 +67,8 @@ export function DiffConfirmPanel({
   highlighted?: boolean;
   canConfirm: boolean;
   busy?: boolean;
-  onHover?: (proposalId: string) => void;
+  outcome?: ConfirmOutcome;
+  onSelect?: (proposalId: string) => void;
   onConfirm: (proposalId: string, path: string, method: string) => void;
   onReject: (proposalId: string, path: string, method: string) => void;
 }) {
@@ -75,13 +77,18 @@ export function DiffConfirmPanel({
   const reject = actionPath(safe.actions, 'reject');
   const pending = safe.status === 'pending';
   const meetingSend = safe.kind === 'meeting_send';
+  const confirmed = outcome?.status === 'confirmed' && outcome.proposalId === safe.proposal_id;
+  const select = () => onSelect?.(safe.proposal_id);
 
   return (
     <section
       data-ui="workspace.diff_confirm_panel"
       data-proposal-id={safe.proposal_id}
-      className={highlighted ? 'cross-highlight' : undefined}
-      onMouseEnter={() => onHover?.(safe.proposal_id)}
+      data-confirm-twin="true"
+      tabIndex={-1}
+      className={`confirm-surface${highlighted ? ' confirm-pulse' : ''}`}
+      onFocusCapture={select}
+      onClick={select}
       style={{
         border: '1px solid var(--line)',
         borderRadius: 10,
@@ -93,38 +100,29 @@ export function DiffConfirmPanel({
     >
       <header style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <strong style={{ fontSize: 13 }}>Workspace confirm</strong>
-        <Badge tone="warn">{safe.status}</Badge>
+        <Badge tone={confirmed ? 'success' : 'default'}>{confirmed ? 'confirmed' : safe.status}</Badge>
         <span className="tabular" style={{ fontSize: 11, color: 'var(--ink-muted)' }}>
           {safe.proposal_id}
         </span>
       </header>
       <DiffBody diff={safe.diff ?? safe.preview} />
       {meetingSend ? (
-        <ReceiptSideSlip
-          panel={{
-            ui: 'workspace.receipts_panel',
-            receipts: Array.isArray(safe.receipts) ? (safe.receipts as never) : [],
-            public_url: null,
-            report_id: typeof safe.payload?.report_id === 'string' ? safe.payload.report_id : null,
-          }}
+        <ReceiptFootnote
+          receipts={Array.isArray(safe.receipts) ? (safe.receipts as never) : []}
+          emptyReason="unavailable"
         />
       ) : null}
-      <footer style={{ display: 'flex', gap: 8 }}>
-        <Button
-          variant="accent"
-          disabled={!pending || !canConfirm || busy || !confirm}
-          onClick={() => confirm && onConfirm(safe.proposal_id, confirm.path, confirm.method)}
-        >
-          Confirm
-        </Button>
-        <Button
-          variant="danger"
-          disabled={!pending || busy || !reject}
-          onClick={() => reject && onReject(safe.proposal_id, reject.path, reject.method)}
-        >
-          Reject
-        </Button>
-      </footer>
+      <ConfirmActions
+        pending={pending}
+        canConfirm={canConfirm}
+        busy={busy}
+        confirm={confirm}
+        reject={reject}
+        outcome={confirmed ? outcome : null}
+        onSelect={select}
+        onConfirm={(path, method) => onConfirm(safe.proposal_id, path, method)}
+        onReject={(path, method) => onReject(safe.proposal_id, path, method)}
+      />
     </section>
   );
 }

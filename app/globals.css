@@ -35,6 +35,10 @@
   --grid: 8px;
   --highlight-ms: 600ms;
   --dissolve-ms: 200ms;
+  --success-fade-ms: 1200ms;
+  --receipt-slip-ms: 140ms;
+  --amber-pulse-ms: 500ms;
+  --confirmed-delta-ms: 800ms;
 }
 
 html,
@@ -105,9 +109,36 @@ body {
   background: var(--accent-soft);
 }
 
-.cross-highlight {
-  box-shadow: inset 0 0 0 2px var(--accent);
-  transition: box-shadow var(--highlight-ms) ease;
+@keyframes confirm-inhale {
+  0% {
+    box-shadow: inset 0 0 0 0 transparent;
+    border-color: var(--line);
+  }
+  100% {
+    box-shadow: inset 0 0 0 2px var(--accent);
+    border-color: var(--accent);
+  }
+}
+
+.confirm-pulse {
+  animation: confirm-inhale var(--highlight-ms) ease-out 1 forwards;
+}
+
+.confirm-success-line {
+  margin: 0;
+  font-size: 13px;
+  color: var(--success);
+  animation: confirm-success-fade var(--success-fade-ms) ease-out 1 forwards;
+}
+
+@keyframes confirm-success-fade {
+  0%,
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 .draft-veil {
@@ -118,7 +149,7 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  transition: opacity var(--dissolve-ms) ease;
+  transition: opacity var(--dissolve-ms) ease, transform var(--dissolve-ms) ease-out;
 }
 
 .draft-veil.is-dissolving {
@@ -126,22 +157,42 @@ body {
   pointer-events: none;
 }
 
+.draft-veil.is-success {
+  animation: veil-dissolve-up var(--dissolve-ms) ease-out 1 forwards;
+  pointer-events: none;
+}
+
+@keyframes veil-dissolve-up {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+}
+
 .scratch-mark {
   position: relative;
 }
 
-.scratch-mark::before {
-  content: "";
+.scratch-watermark-diagonal {
   pointer-events: none;
   position: absolute;
   inset: 0;
-  background: repeating-linear-gradient(
-    -18deg,
-    transparent,
-    transparent 11px,
-    rgba(154, 143, 122, 0.12) 11px,
-    rgba(154, 143, 122, 0.12) 12px
-  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(28px, 6vw, 56px);
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+  opacity: 0.1;
+  transform: rotate(-18deg);
+  white-space: nowrap;
+  user-select: none;
   z-index: 0;
 }
 
@@ -174,20 +225,86 @@ body {
   opacity: 0.7;
 }
 
-@keyframes amber-pulse {
-  0%,
-  100% {
+@keyframes amber-pulse-once {
+  0% {
     color: var(--amber-pulse);
   }
-  50% {
-    color: var(--warn);
+  100% {
+    color: var(--ink);
   }
 }
 
 .amber-pulse {
   color: var(--amber-pulse);
-  animation: amber-pulse 1.6s ease-in-out infinite;
+  animation: amber-pulse-once var(--amber-pulse-ms) ease-out 1 forwards;
   font-variant-numeric: tabular-nums;
+}
+
+.delta-confirmed {
+  animation: delta-teal var(--confirmed-delta-ms) ease-out 1;
+}
+
+@keyframes delta-teal {
+  0% {
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+  100% {
+    color: var(--ink);
+    background: transparent;
+  }
+}
+
+.receipt-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  padding: 0 4px;
+  margin: 0 2px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  position: relative;
+}
+
+.receipt-mark.is-missing {
+  border-style: dashed;
+  color: var(--ink-muted);
+  cursor: default;
+}
+
+.receipt-slip {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 0;
+  z-index: 30;
+  width: min(280px, 70vw);
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(11, 18, 32, 0.08);
+  opacity: 0;
+  transform: translateY(2px);
+  animation: receipt-slip-in var(--receipt-slip-ms) ease-out forwards;
+}
+
+.receipt-slip.is-flip {
+  left: auto;
+  right: calc(100% + 8px);
+}
+
+@keyframes receipt-slip-in {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .btn {

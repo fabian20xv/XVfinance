@@ -1,6 +1,7 @@
 'use client';
 
 import { ConfirmCard, type ConfirmCardModel } from '@/components/chat/ConfirmCard';
+import type { ConfirmOutcome } from '@/components/chat/ConfirmActions';
 import { Composer } from '@/components/chat/Composer';
 import { ToolStatusPill } from '@/components/chat/ToolStatusPill';
 import { DashedEmptySlot } from '@/components/workspace/DashedEmptySlot';
@@ -23,7 +24,10 @@ export function ChatThread({
   busy,
   highlightedProposalId,
   canConfirm,
-  onHoverProposal,
+  hideConfirmCard,
+  pendingCard,
+  outcome,
+  onSelectProposal,
   onConfirm,
   onReject,
 }: {
@@ -35,7 +39,10 @@ export function ChatThread({
   busy?: boolean;
   highlightedProposalId?: string | null;
   canConfirm: boolean;
-  onHoverProposal: (proposalId: string) => void;
+  hideConfirmCard?: boolean;
+  pendingCard?: ConfirmCardModel | null;
+  outcome?: ConfirmOutcome;
+  onSelectProposal: (proposalId: string) => void;
   onConfirm: (proposalId: string, path: string, method: string) => void;
   onReject: (proposalId: string, path: string, method: string) => void;
 }) {
@@ -70,13 +77,14 @@ export function ChatThread({
                 </div>
                 {message.text}
               </div>
-              {message.confirmCard ? (
+              {message.confirmCard && !hideConfirmCard ? (
                 <ConfirmCard
                   card={message.confirmCard}
                   highlighted={highlightedProposalId === message.confirmCard.proposal_id}
                   canConfirm={canConfirm}
                   busy={busy}
-                  onHover={onHoverProposal}
+                  outcome={outcome}
+                  onSelect={onSelectProposal}
                   onConfirm={onConfirm}
                   onReject={onReject}
                 />
@@ -84,6 +92,18 @@ export function ChatThread({
             </div>
           ))
         )}
+        {pendingCard && !hideConfirmCard && !messages.some((row) => row.confirmCard?.proposal_id === pendingCard.proposal_id) ? (
+          <ConfirmCard
+            card={pendingCard}
+            highlighted={highlightedProposalId === pendingCard.proposal_id}
+            canConfirm={canConfirm}
+            busy={busy}
+            outcome={outcome}
+            onSelect={onSelectProposal}
+            onConfirm={onConfirm}
+            onReject={onReject}
+          />
+        ) : null}
       </div>
       <Composer
         value={composer}

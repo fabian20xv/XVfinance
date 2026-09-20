@@ -220,17 +220,18 @@ Ghostwrite writes a **draft** meeting 1-pager (via `reports` with `purpose = mee
 | CA-9.2 | Receipts panel `ui: workspace.receipts_panel` (`get_meeting_receipts`); each receipt is firm-scoped and auditable |
 | CA-9.3 | `propose_meeting_send` (manager confirm, channel `email` \| `export`) + `export_meeting_one_pager` (audited; `public_url` always null) |
 
-## Split-screen shell (E10, Dana v1.1)
+## Split-screen shell (E10, Dana v1.2)
 
-Next.js App Router UI at `app/` (same repo as the Node `/v1` server). Design pack v1.1 is locked: Inter + system-ui, 56/44 split (drag 48–64, reset → 56), 48px top bar, no nav rail, 8px grid, 10px radius.
+Next.js App Router UI at `app/` (same repo as the Node `/v1` server). Design pack v1.2 (Rio sharpen) is copy/motion on the v1.1 inventory: Inter + system-ui, accent `#0F6E6A`, 56/44 split (drag 48–64, reset → 56), 48px top bar, no nav rail, 8px grid, 10px radius. Composer stays unlocked while confirm is pending.
 
 | Surface | Wiring |
 | --- | --- |
 | AuthGate | Supabase Auth session only; user JWT is sent as `Authorization: Bearer` to `/v1` |
-| ConfirmCard + DiffConfirmPanel | Same `proposal_id`; `POST /v1/proposals/:id/confirm` / `reject` |
-| Scratchpad | Veil over live workspace (not a tab). `GET /v1/scratchpads/:id/impact`. Promote → `scratchpad_promote` manager dual-confirm. Discard dissolves in 200ms with no source-of-truth persist |
-| Receipts | `workspace.receipts_panel`; `public_url` is always `null`. Email/Export → `propose_meeting_send` |
+| Confirm pulse | ConfirmCard + DiffConfirmPanel share `proposal_id`. Select/focus (never hover) inhales both borders once (600ms ease-out). Primary **Confirm change**; secondary **Dismiss proposal**. Success: **Confirmed · {time} · you**, then fade ~1.2s. `POST /v1/proposals/:id/confirm` / `reject` |
+| Scratchpad | Veil over the right pane only (not a tab). Diagonal **DRAFT · what-if** at 8–12%. Subline: **Won’t change positions until you confirm.** `GET /v1/scratchpads/:id/impact`. Promote → `scratchpad_promote` manager dual-confirm. ConfirmCard is absent while the veil is open. Success dissolves upward; fail keeps the watermark and toasts **Not applied — still draft.** Discard dissolves in 200ms with no source-of-truth persist |
+| Receipts | Marks **[1]** (not “citation”). Side-slip popover beside the mark (120–160ms fade + 2px rise). Title is source type + relative time; one factual body line; **Open in workspace** only when `path` is present. Missing/RLS → dashed **[?]** **Not available for this account**. `public_url` is always `null`. Email/Export → `propose_meeting_send` |
 | Composer | Stays unlocked while confirm is pending. Dispatches allowlisted `POST /v1/tools` (no invented model chat API) |
+| SpeakReadyToggle | Deferred to epic 1.5 (file kept, not mounted) |
 
 Out of scope: CRM, optimizer, news firehose, scenario libraries, dark mode.
 

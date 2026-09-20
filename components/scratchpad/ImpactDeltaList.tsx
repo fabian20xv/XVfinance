@@ -25,8 +25,10 @@ function rowLabel(row: unknown) {
 
 export function ImpactDeltaList({
   impact,
+  confirmed = false,
 }: {
   impact: ImpactPayload | null;
+  confirmed?: boolean;
 }) {
   if (!impact) {
     return (
@@ -49,11 +51,15 @@ export function ImpactDeltaList({
           <h3 style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--ink-muted)' }}>Changed</h3>
           <ul style={{ margin: 0, paddingLeft: 16 }}>
             {changed.map((row, index) => (
-              <li key={index}>
+              <li key={index} className={confirmed ? 'delta-confirmed' : undefined}>
                 {row.symbol ?? 'instrument'}{' '}
                 <span className="tabular">{row.from_quantity}</span>
                 {' → '}
-                <AmberPulseNumber value={row.to_quantity ?? '—'} />
+                {confirmed ? (
+                  <span className="tabular">{row.to_quantity ?? '—'}</span>
+                ) : (
+                  <AmberPulseNumber value={row.to_quantity ?? '—'} />
+                )}
               </li>
             ))}
           </ul>
@@ -64,8 +70,12 @@ export function ImpactDeltaList({
           <h3 style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--ink-muted)' }}>Added</h3>
           <ul style={{ margin: 0, paddingLeft: 16 }}>
             {added.map((row, index) => (
-              <li key={index}>
-                <AmberPulseNumber value={rowLabel(row)} />
+              <li key={index} className={confirmed ? 'delta-confirmed' : undefined}>
+                {confirmed ? (
+                  <span className="tabular">{rowLabel(row)}</span>
+                ) : (
+                  <AmberPulseNumber value={rowLabel(row)} />
+                )}
               </li>
             ))}
           </ul>
@@ -76,7 +86,7 @@ export function ImpactDeltaList({
           <h3 style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--ink-muted)' }}>Removed</h3>
           <ul style={{ margin: 0, paddingLeft: 16 }}>
             {removed.map((row, index) => (
-              <li key={index} className="tabular">
+              <li key={index} className={`tabular${confirmed ? ' delta-confirmed' : ''}`}>
                 {rowLabel(row)}
               </li>
             ))}

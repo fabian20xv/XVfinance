@@ -9,13 +9,17 @@ export function FocusChip({
   portfolios,
   clientId,
   portfolioId,
+  entityLabel,
   onChange,
+  onEntityClick,
 }: {
   clients: Option[];
   portfolios: Option[];
   clientId?: string | null;
   portfolioId?: string | null;
+  entityLabel?: string | null;
   onChange: (next: { client_id: string | null; portfolio_id: string | null }) => void;
+  onEntityClick?: () => void;
 }) {
   if (clients.length === 0 && !clientId) {
     return (
@@ -29,6 +33,17 @@ export function FocusChip({
     : portfolios;
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      {entityLabel ? (
+        <button
+          type="button"
+          className="badge badge-accent"
+          onClick={onEntityClick}
+          title="Scroll to the focused entity in the workspace"
+          style={{ cursor: onEntityClick ? 'pointer' : 'default' }}
+        >
+          {entityLabel}
+        </button>
+      ) : null}
       <label style={{ fontSize: 11, color: 'var(--ink-muted)' }}>
         Client
         <select

@@ -1,7 +1,7 @@
 import { SPLIT } from './tokens.js';
 
 /**
- * Clamp the chat pane width to Dana v1.1 (48–64). Default 56.
+ * Clamp the chat pane width to Dana v1.2 (48–64). Default 56.
  * @param {unknown} value
  * @returns {number}
  */

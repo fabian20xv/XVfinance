@@ -1,5 +1,14 @@
-import { DashedEmptySlot } from '@/components/workspace/DashedEmptySlot';
-import { withNullPublicUrl } from '@/src/web/dual-confirm.js';
+'use client';
+
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  RECEIPT_OPEN_WORKSPACE,
+  RECEIPT_UNAVAILABLE,
+  receiptBodyLine,
+  receiptDeepLink,
+  receiptMark,
+  receiptTitle,
+} from '@/src/web/receipt-ui.js';
 
 export type Receipt = {
   id?: string;
@@ -22,44 +31,157 @@ export type ReceiptsPanel = {
   status?: string;
 };
 
-export function ReceiptSideSlip({ panel }: { panel: ReceiptsPanel | null }) {
-  if (!panel) {
-    return <DashedEmptySlot label="No receipts panel" />;
-  }
-  const safe = withNullPublicUrl(panel) as ReceiptsPanel;
-  const receipts = Array.isArray(safe.receipts) ? safe.receipts : [];
+export function ReceiptSideSlip({
+  receipt,
+  index,
+  total,
+  flip,
+  onClose,
+  onStep,
+}: {
+  receipt: Receipt;
+  index: number;
+  total: number;
+  flip?: boolean;
+  onClose: () => void;
+  onStep?: (delta: number) => void;
+}) {
+  const ref = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    ref.current?.focus();
+  }, [index]);
+
+  const deepLink = receiptDeepLink(receipt);
+  const body = receiptBodyLine(receipt);
+
   return (
     <aside
+      ref={ref as never}
       data-ui="workspace.receipts_panel"
       data-public-url="null"
-      style={{
-        border: '1px solid var(--line)',
-        borderRadius: 10,
-        padding: 12,
-        background: 'var(--paper)',
-        display: 'grid',
-        gap: 8,
+      className={`receipt-slip${flip ? ' is-flip' : ''}`}
+      role="dialog"
+      aria-modal="false"
+      aria-label={receiptTitle(receipt)}
+      tabIndex={-1}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          onClose();
+        }
+        if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          onStep?.(-1);
+        }
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          onStep?.(1);
+        }
       }}
     >
-      <header style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-        <strong>Receipts</strong>
-        <span style={{ color: 'var(--ink-muted)' }}>public_url: null</span>
+      <header style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12 }}>
+        <strong>{receiptTitle(receipt)}</strong>
+        <span className="tabular" style={{ color: 'var(--ink-muted)' }}>
+          {index + 1}/{total}
+        </span>
       </header>
-      {receipts.length === 0 ? (
-        <DashedEmptySlot label="No receipts on this 1-pager" />
-      ) : (
-        receipts.map((row) => (
-          <div key={row.id ?? row.citation} style={{ fontSize: 12 }}>
-            <div>
-              [{row.citation}] {row.label}
-            </div>
-            <div style={{ color: 'var(--ink-muted)' }}>{row.excerpt}</div>
-            <div className="tabular" style={{ color: 'var(--ink-muted)', fontSize: 11 }}>
-              {row.source_table} · {row.path} · public_url: null
-            </div>
-          </div>
-        ))
-      )}
+      <p style={{ margin: '8px 0 0', fontSize: 13 }}>
+        {body || RECEIPT_UNAVAILABLE}
+      </p>
+      {deepLink ? (
+        <a
+          href={deepLink}
+          style={{ display: 'inline-block', marginTop: 8, fontSize: 12, color: 'var(--accent)' }}
+        >
+          {RECEIPT_OPEN_WORKSPACE}
+        </a>
+      ) : null}
+      <div style={{ marginTop: 8, fontSize: 11, color: 'var(--ink-muted)' }}>public_url: null</div>
     </aside>
+  );
+}
+
+export function ReceiptMark({
+  receipts,
+  index,
+  missing,
+  openIndex,
+  onOpen,
+  onClose,
+}: {
+  receipts: Receipt[];
+  index: number;
+  missing?: boolean;
+  openIndex: number | null;
+  onOpen: (index: number) => void;
+  onClose: () => void;
+}) {
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const wrapRef = useRef<HTMLSpanElement | null>(null);
+  const [flip, setFlip] = useState(false);
+  const receipt = !missing && index >= 0 ? receipts[index] : null;
+  const open = openIndex === index && Boolean(receipt);
+
+  useLayoutEffect(() => {
+    if (!open || !wrapRef.current) {
+      return;
+    }
+    const rect = wrapRef.current.getBoundingClientRect();
+    setFlip(rect.right + 288 > window.innerWidth - 8);
+  }, [open]);
+
+  const closeAndRestore = () => {
+    onClose();
+    requestAnimationFrame(() => buttonRef.current?.focus());
+  };
+
+  if (missing || !receipt) {
+    return (
+      <span
+        className="receipt-mark is-missing"
+        title={RECEIPT_UNAVAILABLE}
+        aria-label={RECEIPT_UNAVAILABLE}
+      >
+        {receiptMark(index, true)}
+      </span>
+    );
+  }
+
+  return (
+    <span ref={wrapRef} style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        ref={buttonRef}
+        type="button"
+        className="receipt-mark"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        onClick={(event) => {
+          event.stopPropagation();
+          if (open) {
+            closeAndRestore();
+          } else {
+            onOpen(index);
+          }
+        }}
+      >
+        {receiptMark(index)}
+      </button>
+      {open ? (
+        <ReceiptSideSlip
+          receipt={receipt}
+          index={index}
+          total={receipts.length}
+          flip={flip}
+          onClose={closeAndRestore}
+          onStep={(delta) => {
+            const next = index + delta;
+            if (next >= 0 && next < receipts.length) {
+              onOpen(next);
+            }
+          }}
+        />
+      ) : null}
+    </span>
   );
 }

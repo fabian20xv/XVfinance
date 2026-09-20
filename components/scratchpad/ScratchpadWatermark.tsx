@@ -1,24 +1,19 @@
-import { SCRATCHPAD_WATERMARK } from '@/src/web/scratchpad-ui.js';
+import { SCRATCHPAD_WATERMARK_DISPLAY } from '@/src/web/scratchpad-ui.js';
 
 export function ScratchpadWatermark({
-  watermark = SCRATCHPAD_WATERMARK,
+  phrase = SCRATCHPAD_WATERMARK_DISPLAY,
 }: {
+  phrase?: string;
   watermark?: string;
 }) {
   return (
     <div
+      className="scratch-watermark-diagonal"
       data-source-of-truth="false"
       data-live="false"
-      style={{
-        fontSize: 11,
-        letterSpacing: '0.08em',
-        textTransform: 'uppercase',
-        color: 'var(--ink-muted)',
-        padding: '8px 16px',
-        borderBottom: '1px solid var(--line)',
-      }}
+      aria-hidden="true"
     >
-      {watermark}
+      {phrase}
     </div>
   );
 }

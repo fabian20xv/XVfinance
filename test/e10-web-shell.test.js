@@ -10,9 +10,11 @@ import { restoreXvPath } from '../src/server/fetch-xv-path.js';
 import { createFetchHandler } from '../src/server/fetch-adapter.js';
 import { assertSharedProposalId, confirmCardFields, withNullPublicUrl } from '../src/web/dual-confirm.js';
 import { parseComposerInput } from '../src/web/parse-composer.js';
-import { discardedScratchpadState, scratchpadOverlay, SCRATCHPAD_EXIT_MS } from '../src/web/scratchpad-ui.js';
+import { discardedScratchpadState, scratchpadOverlay, SCRATCHPAD_EXIT_MS, SCRATCHPAD_FAIL_TOAST, SCRATCHPAD_WATERMARK_DISPLAY, SCRATCHPAD_WATERMARK_SUBLINE, formatAsOfChip } from '../src/web/scratchpad-ui.js';
 import { clampChatPct, resetChatPct, workspacePct } from '../src/web/split.js';
-import { CHROME, MOTION, SPLIT, TOKENS } from '../src/web/tokens.js';
+import { CHROME, DANA_VERSION, MOTION, SPLIT, TOKENS } from '../src/web/tokens.js';
+import { confirmedLine, CONFIRM_COPY, isUnreadEdgeClipped } from '../src/web/confirm-ui.js';
+import { focusEntityLabel, receiptBodyLine, receiptMark, receiptTitle, RECEIPT_NO_LAST_MEETING, RECEIPT_UNAVAILABLE, relativeTime } from '../src/web/receipt-ui.js';
 import { SMOKE_PROPOSAL_ID } from '../src/db/smoke-ids.js';
 import { ALLOWED_SUPABASE_URL } from '../src/config/supabase-lock.js';
 import { SCRATCHPAD_WATERMARK } from '../src/scratchpad/contract.js';
@@ -25,8 +27,9 @@ function read(rel) {
   return readFileSync(join(root, rel), 'utf8');
 }
 
-describe('E10 Dana v1.1 split-screen shell', () => {
+describe('E10 Dana v1.2 split-screen shell', () => {
   it('locks Dana tokens, chrome, split, and motion', () => {
+    assert.equal(DANA_VERSION, '1.2');
     assert.equal(TOKENS.ink, '#0B1220');
     assert.equal(TOKENS.inkMuted, '#5B657A');
     assert.equal(TOKENS.paper, '#F7F8FA');
@@ -40,7 +43,7 @@ describe('E10 Dana v1.1 split-screen shell', () => {
     assert.equal(TOKENS.success, '#067647');
     assert.equal(TOKENS.draftVeil, 'rgba(244,241,232,0.72)');
     assert.equal(TOKENS.scratchMark, '#9A8F7A');
-    assert.equal(TOKENS.scratchMarkAlpha, 0.12);
+    assert.equal(TOKENS.scratchMarkAlpha, 0.1);
     assert.equal(CHROME.topBarPx, 48);
     assert.equal(CHROME.gridPx, 8);
     assert.equal(CHROME.radiusPx, 10);
@@ -48,7 +51,13 @@ describe('E10 Dana v1.1 split-screen shell', () => {
     assert.equal(SPLIT.defaultChatPct, 56);
     assert.equal(SPLIT.workspacePctAtDefault, 44);
     assert.equal(MOTION.crossHighlightMs, 600);
+    assert.equal(MOTION.confirmPulseEase, 'ease-out');
     assert.equal(MOTION.scratchpadDissolveMs, 200);
+    assert.equal(MOTION.successFadeMs, 1200);
+    assert.equal(MOTION.receiptSlipMs, 140);
+    assert.equal(MOTION.receiptRisePx, 2);
+    assert.equal(MOTION.amberPulseMs, 500);
+    assert.equal(MOTION.confirmedDeltaMs, 800);
     assert.equal(SCRATCHPAD_EXIT_MS, 200);
   });
 
@@ -206,6 +215,7 @@ describe('E10 Dana v1.1 split-screen shell', () => {
       'components/chat/ChatThread.tsx',
       'components/chat/ToolStatusPill.tsx',
       'components/chat/ConfirmCard.tsx',
+      'components/chat/ConfirmActions.tsx',
       'components/chat/Composer.tsx',
       'components/workspace/WorkspaceHeader.tsx',
       'components/workspace/HoldingsTable.tsx',
@@ -236,16 +246,71 @@ describe('E10 Dana v1.1 split-screen shell', () => {
     const card = read('components/chat/ConfirmCard.tsx');
     assert.match(card, /chat\.confirm_card/);
     assert.match(card, /proposal_id/);
+    assert.match(card, /confirm-pulse/);
+    assert.equal(card.includes('onMouseEnter'), false);
+    assert.equal(card.includes('onHover'), false);
+    const actions = read('components/chat/ConfirmActions.tsx');
+    assert.match(actions, /CONFIRM_COPY/);
+    assert.match(actions, /confirmedLine/);
     const panel = read('components/workspace/DiffConfirmPanel.tsx');
     assert.match(panel, /workspace\.diff_confirm_panel/);
+    assert.match(panel, /confirm-pulse/);
+    assert.equal(panel.includes('onMouseEnter'), false);
     const composer = read('components/chat/Composer.tsx');
     assert.match(composer, /unlocked-during-confirm/);
     const veil = read('components/scratchpad/DraftVeil.tsx');
     assert.match(veil, /source-of-truth="false"/);
+    assert.match(veil, /SCRATCHPAD_WATERMARK_SUBLINE/);
+    const watermark = read('components/scratchpad/ScratchpadWatermark.tsx');
+    assert.match(watermark, /SCRATCHPAD_WATERMARK_DISPLAY/);
     const receipts = read('components/meeting/ReceiptSideSlip.tsx');
     assert.match(receipts, /public_url: null/);
+    assert.match(receipts, /receipt-slip/);
+    const footnote = read('components/meeting/ReceiptFootnote.tsx');
+    assert.match(footnote, /\[\?\]/);
+    assert.equal(footnote.includes('Citations'), false);
+    assert.equal(footnote.includes('cited'), false);
+    const shell = read('components/shell/AppShell.tsx');
+    assert.equal(shell.includes('SpeakReadyToggle'), false);
+    assert.match(shell, /hideConfirmCard=\{scratchpad\.open\}/);
     const css = read('app/globals.css');
     assert.match(css, /#0f6e6a/i);
+    assert.equal(css.includes('#0D9488'), false);
     assert.match(css, /--chrome-height: 48px/);
+    assert.match(css, /confirm-inhale/);
+    assert.match(css, /ease-out/);
+    assert.match(css, /amber-pulse-once/);
+    assert.match(css, /veil-dissolve-up/);
+    assert.match(css, /translateY\(2px\)/);
+    assert.equal(css.includes('infinite'), false);
+  });
+
+  it('confirm pulse copy, success line, and clipped unread-edge helper', () => {
+    assert.equal(CONFIRM_COPY.primary, 'Confirm change');
+    assert.equal(CONFIRM_COPY.secondary, 'Dismiss proposal');
+    assert.match(confirmedLine(new Date('2026-09-20T16:05:00')), /Confirmed · .+ · you/);
+    assert.equal(isUnreadEdgeClipped({ top: -8, bottom: 40 }, { top: 0, bottom: 100 }), true);
+    assert.equal(isUnreadEdgeClipped({ top: 10, bottom: 40 }, { top: 0, bottom: 100 }), false);
+  });
+
+  it('scratchpad UI copy is DRAFT · what-if without changing the API watermark', () => {
+    const overlay = scratchpadOverlay({ id: 'sp' });
+    assert.equal(overlay.watermark, SCRATCHPAD_WATERMARK);
+    assert.equal(SCRATCHPAD_WATERMARK_DISPLAY, 'DRAFT · what-if');
+    assert.equal(SCRATCHPAD_WATERMARK_SUBLINE, "Won't change positions until you confirm.");
+    assert.equal(SCRATCHPAD_FAIL_TOAST, 'Not applied — still draft.');
+    assert.match(formatAsOfChip('2026-09-20T15:04:00Z', 'abcd-efgh'), /as of \d{2}:\d{2} · pf·abcd/);
+  });
+
+  it('receipt marks are [1] / dashed [?], never invented, FocusChip names the entity', () => {
+    assert.equal(receiptMark(0), '[1]');
+    assert.equal(receiptMark(-1, true), '[?]');
+    assert.equal(RECEIPT_UNAVAILABLE, 'Not available for this account');
+    assert.equal(RECEIPT_NO_LAST_MEETING, 'No last meeting on file');
+    assert.equal(receiptTitle({ source_table: 'notes', as_of: new Date(Date.now() - 2 * 3600 * 1000).toISOString() }).startsWith('Note · '), true);
+    assert.equal(receiptBodyLine({ excerpt: 'Held 12 NVDA\nmore' }), 'Held 12 NVDA');
+    assert.equal(receiptBodyLine({}), '');
+    assert.equal(relativeTime(new Date(Date.now() - 90 * 1000).toISOString()), '2m ago');
+    assert.equal(focusEntityLabel('NVDA', 'impact'), 'NVDA · impact');
   });
 });

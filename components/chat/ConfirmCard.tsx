@@ -1,7 +1,7 @@
 'use client';
 
 import { Badge } from '@/components/primitives/Badge';
-import { Button } from '@/components/primitives/Button';
+import { ConfirmActions, type ConfirmOutcome } from '@/components/chat/ConfirmActions';
 import { actionPath, confirmCardFields } from '@/src/web/dual-confirm.js';
 
 export type ConfirmCardModel = {
@@ -22,7 +22,8 @@ export function ConfirmCard({
   highlighted,
   canConfirm,
   busy,
-  onHover,
+  outcome,
+  onSelect,
   onConfirm,
   onReject,
 }: {
@@ -30,7 +31,8 @@ export function ConfirmCard({
   highlighted?: boolean;
   canConfirm: boolean;
   busy?: boolean;
-  onHover?: (proposalId: string) => void;
+  outcome?: ConfirmOutcome;
+  onSelect?: (proposalId: string) => void;
   onConfirm: (proposalId: string, path: string, method: string) => void;
   onReject: (proposalId: string, path: string, method: string) => void;
 }) {
@@ -42,13 +44,19 @@ export function ConfirmCard({
   const confirm = actionPath(fields.actions, 'confirm');
   const reject = actionPath(fields.actions, 'reject');
   const pending = fields.status === 'pending';
+  const confirmed = outcome?.status === 'confirmed' && outcome.proposalId === proposalId;
+  const select = () => onSelect?.(proposalId);
+  const badgeTone = confirmed ? 'success' : pending ? 'default' : 'default';
 
   return (
     <article
       data-ui="chat.confirm_card"
       data-proposal-id={proposalId}
-      className={highlighted ? 'cross-highlight' : undefined}
-      onMouseEnter={() => onHover?.(proposalId)}
+      data-confirm-twin="true"
+      tabIndex={-1}
+      className={`confirm-surface${highlighted ? ' confirm-pulse' : ''}`}
+      onFocusCapture={select}
+      onClick={select}
       style={{
         border: '1px solid var(--line)',
         borderRadius: 10,
@@ -60,9 +68,7 @@ export function ConfirmCard({
     >
       <header style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <strong style={{ fontSize: 13 }}>{fields.preview?.title ?? fields.kind}</strong>
-        <Badge tone={pending ? 'warn' : fields.status === 'confirmed' ? 'success' : 'default'}>
-          {fields.status}
-        </Badge>
+        <Badge tone={badgeTone}>{confirmed ? 'confirmed' : fields.status}</Badge>
         <Badge>{fields.requires_role}</Badge>
       </header>
       {fields.preview?.summary ? (
@@ -85,7 +91,7 @@ export function ConfirmCard({
         <dt>kind</dt>
         <dd style={{ margin: 0 }}>{fields.kind}</dd>
         <dt>status</dt>
-        <dd style={{ margin: 0 }}>{fields.status}</dd>
+        <dd style={{ margin: 0 }}>{confirmed ? 'confirmed' : fields.status}</dd>
         <dt>db_status</dt>
         <dd style={{ margin: 0 }}>{fields.db_status}</dd>
         <dt>requires_role</dt>
@@ -97,22 +103,17 @@ export function ConfirmCard({
         <dt>idempotency_key</dt>
         <dd style={{ margin: 0 }}>{fields.idempotency_key ?? '—'}</dd>
       </dl>
-      <footer style={{ display: 'flex', gap: 8 }}>
-        <Button
-          variant="accent"
-          disabled={!pending || !canConfirm || busy || !confirm}
-          onClick={() => confirm && onConfirm(proposalId, confirm.path, confirm.method)}
-        >
-          Confirm
-        </Button>
-        <Button
-          variant="danger"
-          disabled={!pending || busy || !reject}
-          onClick={() => reject && onReject(proposalId, reject.path, reject.method)}
-        >
-          Reject
-        </Button>
-      </footer>
+      <ConfirmActions
+        pending={pending}
+        canConfirm={canConfirm}
+        busy={busy}
+        confirm={confirm}
+        reject={reject}
+        outcome={confirmed ? outcome : null}
+        onSelect={select}
+        onConfirm={(path, method) => onConfirm(proposalId, path, method)}
+        onReject={(path, method) => onReject(proposalId, path, method)}
+      />
     </article>
   );
 }

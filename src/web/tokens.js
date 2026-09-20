@@ -1,9 +1,10 @@
 /**
- * Dana design pack v1.1 — locked tokens for the E10 split-screen shell.
- * Do not invent colors. Chrome is 48px, 8px grid, 10px radius.
+ * Dana design pack v1.2 — locked tokens for the E10 split-screen shell.
+ * Copy/motion sharpened (Rio); inventory unchanged. Do not invent colors.
+ * Sketch teal #0D9488 loses to accent #0F6E6A.
  */
 
-export const DANA_VERSION = '1.1';
+export const DANA_VERSION = '1.2';
 
 export const TOKENS = Object.freeze({
   ink: '#0B1220',
@@ -19,7 +20,7 @@ export const TOKENS = Object.freeze({
   success: '#067647',
   draftVeil: 'rgba(244,241,232,0.72)',
   scratchMark: '#9A8F7A',
-  scratchMarkAlpha: 0.12,
+  scratchMarkAlpha: 0.1,
 });
 
 export const CHROME = Object.freeze({
@@ -40,5 +41,11 @@ export const SPLIT = Object.freeze({
 
 export const MOTION = Object.freeze({
   crossHighlightMs: 600,
+  confirmPulseEase: 'ease-out',
   scratchpadDissolveMs: 200,
+  successFadeMs: 1200,
+  receiptSlipMs: 140,
+  receiptRisePx: 2,
+  amberPulseMs: 500,
+  confirmedDeltaMs: 800,
 });
