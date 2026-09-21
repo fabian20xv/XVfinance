@@ -399,13 +399,40 @@ describe('E11 src/ai isolation', () => {
       }
     }
     assert.deepEqual(violations, []);
+    const http = readFileSync(join(ROOT, 'src/server/http.js'), 'utf8');
+    assert.match(http, /path === '\/v1\/ai\/chat'/);
+    assert.equal(http.includes("path === '/v1/chat'"), false);
+    const api = readFileSync(join(ROOT, 'lib/api.ts'), 'utf8');
+    assert.match(api, /fetch\('\/v1\/ai\/chat'/);
+    assert.equal(api.includes("fetch('/v1/chat'"), false);
+    const composer = readFileSync(join(ROOT, 'components/chat/Composer.tsx'), 'utf8');
+    assert.match(composer, /\/v1\/ai\/chat/);
+    assert.equal(composer.includes('/v1/tools'), false);
+    const shell = readFileSync(join(ROOT, 'components/shell/AppShell.tsx'), 'utf8');
+    assert.match(shell, /streamChatTurn/);
+    assert.equal(shell.includes('POST /v1/tools'), false);
   });
 });
 
-describe('E11 POST /v1/chat HTTP', () => {
+describe('E11 POST /v1/ai/chat HTTP', () => {
+  it('RFC-011: POST /v1/chat is not the agent path (404)', async (t) => {
+    const token = await mint();
+    await withServer(t, { deps: sessionDeps }, async (port) => {
+      const res = await fetch(`http://127.0.0.1:${port}/v1/chat`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${token}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ messages: [{ role: 'user', content: 'hi' }], stream: false }),
+      });
+      assert.equal(res.status, 404);
+    });
+  });
+
   it('requires a bearer user JWT like /v1/tools', async (t) => {
     await withServer(t, {}, async (port) => {
-      const res = await fetch(`http://127.0.0.1:${port}/v1/chat`, {
+      const res = await fetch(`http://127.0.0.1:${port}/v1/ai/chat`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ messages: [{ role: 'user', content: 'hi' }], stream: false }),
@@ -420,7 +447,7 @@ describe('E11 POST /v1/chat HTTP', () => {
   it('returns a clear 503 when OPENAI_API_KEY is missing (no fake success)', async (t) => {
     const token = await mint();
     await withServer(t, { deps: sessionDeps }, async (port) => {
-      const res = await fetch(`http://127.0.0.1:${port}/v1/chat`, {
+      const res = await fetch(`http://127.0.0.1:${port}/v1/ai/chat`, {
         method: 'POST',
         headers: {
           authorization: `Bearer ${token}`,
@@ -465,7 +492,7 @@ describe('E11 POST /v1/chat HTTP', () => {
         },
       },
       async (port) => {
-        const res = await fetch(`http://127.0.0.1:${port}/v1/chat`, {
+        const res = await fetch(`http://127.0.0.1:${port}/v1/ai/chat`, {
           method: 'POST',
           headers: {
             authorization: `Bearer ${token}`,
@@ -497,7 +524,7 @@ describe('E11 POST /v1/chat HTTP', () => {
       t,
       { deps: { ...sessionDeps, chatProvider: provider } },
       async (port) => {
-        const res = await fetch(`http://127.0.0.1:${port}/v1/chat`, {
+        const res = await fetch(`http://127.0.0.1:${port}/v1/ai/chat`, {
           method: 'POST',
           headers: {
             authorization: `Bearer ${token}`,
@@ -533,7 +560,7 @@ describe('E11 POST /v1/chat HTTP', () => {
       },
     });
     const response = await handler(
-      new Request('http://127.0.0.1/v1/chat', {
+      new Request('http://127.0.0.1/v1/ai/chat', {
         method: 'POST',
         headers: {
           authorization: `Bearer ${token}`,

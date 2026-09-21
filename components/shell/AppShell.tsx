@@ -251,146 +251,93 @@ export function AppShell({
       pushMessage({ id: newId(), role: 'assistant', text: parsed.message });
       return;
     }
-    if (parsed.type === 'message') {
-      const history = messages
-        .filter((row) => row.role === 'user' || row.role === 'assistant')
-        .map((row) => ({ role: row.role, content: row.text }))
-        .concat({ role: 'user', content: parsed.text });
-      const assistantId = newId();
-      pushMessage({ id: assistantId, role: 'assistant', text: '' });
-      setBusy(true);
-      let assembled = '';
-      const result = await streamChatTurn(token, firmId, history, {
-        onDelta: (chunk) => {
-          assembled += chunk;
-          setMessages((list) =>
-            list.map((row) => (row.id === assistantId ? { ...row, text: assembled } : row))
-          );
-        },
-        onTool: (event) => {
-          if (!event.name) {
-            return;
-          }
-          setMessages((list) => {
-            const existing = list.find((row) => row.toolName === event.name && row.role === 'tool' && row.toolStatus === 'running');
-            if (event.status === 'running' && !existing) {
-              return [
-                ...list,
-                {
-                  id: newId(),
-                  role: 'tool' as const,
-                  text: `tool ${event.name}`,
-                  toolName: event.name,
-                  toolStatus: 'running',
-                },
-              ];
-            }
-            return list.map((row) =>
-              row.role === 'tool' && row.toolName === event.name && (row.toolStatus === 'running' || row.id === existing?.id)
-                ? {
-                    ...row,
-                    toolStatus: event.status ?? row.toolStatus,
-                    text: event.error?.message ?? row.text,
-                  }
-                : row
-            );
-          });
-        },
-      });
-      setBusy(false);
-      if (!result.ok) {
-        const message = result.error?.message ?? 'Chat turn failed.';
+    const history = messages
+      .filter((row) => row.role === 'user' || row.role === 'assistant')
+      .map((row) => ({ role: row.role, content: row.text }))
+      .concat({ role: 'user', content: text.trim() });
+    const assistantId = newId();
+    pushMessage({ id: assistantId, role: 'assistant', text: '' });
+    setBusy(true);
+    let assembled = '';
+    const result = await streamChatTurn(token, firmId, history, {
+      onDelta: (chunk) => {
+        assembled += chunk;
         setMessages((list) =>
-          list.map((row) => (row.id === assistantId ? { ...row, text: assembled || message } : row))
+          list.map((row) => (row.id === assistantId ? { ...row, text: assembled } : row))
         );
-        toast(message);
-        return;
-      }
-      const data = {
-        ...(typeof result.confirm_card === 'object' && result.confirm_card ? { confirm_card: result.confirm_card } : {}),
-        ...(typeof result.workspace_panel === 'object' && result.workspace_panel
-          ? { workspace_panel: result.workspace_panel }
-          : {}),
-      } as Record<string, unknown>;
-      attachProposal(data);
-      const pending = Boolean(
-        result.confirm_card &&
-          typeof result.confirm_card === 'object' &&
-          (result.confirm_card as ConfirmCardModel).status === 'pending'
-      );
+      },
+      onTool: (event) => {
+        if (!event.name) {
+          return;
+        }
+        setMessages((list) => {
+          const existing = list.find((row) => row.toolName === event.name && row.role === 'tool' && row.toolStatus === 'running');
+          if (event.status === 'running' && !existing) {
+            return [
+              ...list,
+              {
+                id: newId(),
+                role: 'tool' as const,
+                text: `tool ${event.name}`,
+                toolName: event.name,
+                toolStatus: 'running',
+              },
+            ];
+          }
+          return list.map((row) =>
+            row.role === 'tool' && row.toolName === event.name && (row.toolStatus === 'running' || row.id === existing?.id)
+              ? {
+                  ...row,
+                  toolStatus: event.status ?? row.toolStatus,
+                  text: event.error?.message ?? row.text,
+                }
+              : row
+          );
+        });
+      },
+    });
+    setBusy(false);
+    if (!result.ok) {
+      const message = result.error?.message ?? 'Chat turn failed.';
       setMessages((list) =>
-        list.map((row) =>
-          row.id === assistantId
-            ? {
-                ...row,
-                text: result.text || assembled || row.text,
-                confirmCard: (result.confirm_card as ConfirmCardModel | undefined) ?? undefined,
-                toolStatus: pending ? 'pending_confirm' : undefined,
-              }
-            : row
-        )
+        list.map((row) => (row.id === assistantId ? { ...row, text: assembled || message } : row))
       );
-      const meeting = result.artifacts?.meeting as MeetingReport | undefined;
-      if (meeting) {
-        setMeetingMissing(false);
-        setMeeting(meeting);
-        setWorkspaceMode('meeting');
-      }
-      const report = result.artifacts?.report as ReportDraft | undefined;
-      if (report) {
-        setReport(report);
-        setWorkspaceMode('report');
-      }
+      toast(message);
       return;
     }
-    const runningId = newId();
-    pushMessage({
-      id: runningId,
-      role: 'tool',
-      text: `POST /v1/tools ${parsed.name}`,
-      toolName: parsed.name,
-      toolStatus: 'running',
-    });
-    setBusy(true);
-    const result = await runTool(parsed.name, parsed.args);
-    setBusy(false);
-    const data = result.data as Record<string, unknown> | undefined;
+    const data = {
+      ...(typeof result.confirm_card === 'object' && result.confirm_card ? { confirm_card: result.confirm_card } : {}),
+      ...(typeof result.workspace_panel === 'object' && result.workspace_panel
+        ? { workspace_panel: result.workspace_panel }
+        : {}),
+    } as Record<string, unknown>;
     attachProposal(data);
     const pending = Boolean(
-      data &&
-        ((data.confirm_card as ConfirmCardModel | undefined)?.status === 'pending' ||
-          data.status === 'pending' ||
-          (data.ui === 'chat.confirm_card' && data.status === 'pending'))
+      result.confirm_card &&
+        typeof result.confirm_card === 'object' &&
+        (result.confirm_card as ConfirmCardModel).status === 'pending'
     );
     setMessages((list) =>
       list.map((row) =>
-        row.id === runningId
+        row.id === assistantId
           ? {
               ...row,
-              toolStatus: result.ok ? (pending ? 'pending_confirm' : 'ok') : 'error',
-              text: result.ok
-                ? JSON.stringify(result.data, null, 2)
-                : result.error?.message ?? 'Tool failed',
-              confirmCard:
-                (data?.confirm_card as ConfirmCardModel | undefined) ??
-                (data?.ui === 'chat.confirm_card' ? (data as ConfirmCardModel) : undefined),
+              text: result.text || assembled || row.text,
+              confirmCard: (result.confirm_card as ConfirmCardModel | undefined) ?? undefined,
+              toolStatus: pending ? 'pending_confirm' : undefined,
             }
           : row
       )
     );
-    if (parsed.name === 'get_meeting_one_pager') {
-      if (result.ok && data) {
-        setMeetingMissing(false);
-        setMeeting(data as MeetingReport);
-        setWorkspaceMode('meeting');
-      } else {
-        setMeeting(null);
-        setMeetingMissing(true);
-        setWorkspaceMode('meeting');
-      }
+    const meeting = result.artifacts?.meeting as MeetingReport | undefined;
+    if (meeting) {
+      setMeetingMissing(false);
+      setMeeting(meeting);
+      setWorkspaceMode('meeting');
     }
-    if (parsed.name === 'get_report' && result.ok && data) {
-      setReport(data as ReportDraft);
+    const report = result.artifacts?.report as ReportDraft | undefined;
+    if (report) {
+      setReport(report);
       setWorkspaceMode('report');
     }
   };

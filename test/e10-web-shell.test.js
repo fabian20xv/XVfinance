@@ -259,7 +259,8 @@ describe('E10 Dana v1.2 split-screen shell', () => {
     assert.equal(panel.includes('onMouseEnter'), false);
     const composer = read('components/chat/Composer.tsx');
     assert.match(composer, /unlocked-during-confirm/);
-    assert.match(composer, /\/v1\/chat/);
+    assert.match(composer, /\/v1\/ai\/chat/);
+    assert.equal(composer.includes('/v1/tools'), false);
     const veil = read('components/scratchpad/DraftVeil.tsx');
     assert.match(veil, /source-of-truth="false"/);
     const header = read('components/workspace/WorkspaceHeader.tsx');
@@ -277,7 +278,9 @@ describe('E10 Dana v1.2 split-screen shell', () => {
     assert.equal(footnote.includes('Citations'), false);
     assert.equal(footnote.includes('cited'), false);
     const shell = read('components/shell/AppShell.tsx');
-    assert.match(shell, /\/v1\/chat|streamChatTurn/);
+    assert.match(shell, /streamChatTurn/);
+    assert.match(read('lib/api.ts'), /\/v1\/ai\/chat/);
+    assert.equal(read('lib/api.ts').includes("fetch('/v1/chat'"), false);
     assert.equal(shell.includes('SpeakReadyToggle'), false);
     assert.match(shell, /hideConfirmCard=\{scratchpad\.open\}/);
     const chip = read('components/shell/FocusChip.tsx');

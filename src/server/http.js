@@ -309,7 +309,7 @@ export function createRequestListener({ env = process.env, deps = {} } = {}) {
         return;
       }
 
-      if (req.method === 'POST' && path === '/v1/chat') {
+      if (req.method === 'POST' && path === '/v1/ai/chat') {
         const { token, session } = await authenticate(req, resolved);
         const body = await readJsonBody(req);
         await handleV1Chat({

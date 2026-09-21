@@ -150,7 +150,7 @@ export async function streamChatTurn(
     onError?: (error: { code?: string; message?: string }) => void;
   } = {}
 ): Promise<ChatTurnResult> {
-  const response = await fetch('/v1/chat', {
+  const response = await fetch('/v1/ai/chat', {
     method: 'POST',
     headers: chatHeaders(token, firmId),
     body: JSON.stringify({ messages, stream: true }),

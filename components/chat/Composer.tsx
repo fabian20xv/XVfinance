@@ -40,8 +40,8 @@ export function Composer({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
         <span style={{ fontSize: 11, color: 'var(--ink-muted)' }}>
           {pendingConfirm
-            ? 'Confirm pending — composer stays unlocked. Natural language → POST /v1/chat; /tool → /v1/tools.'
-            : 'POST /v1/chat · /tool → /v1/tools · composer unlocked while confirm pending'}
+            ? 'Confirm pending — composer stays unlocked. Turns go to POST /v1/ai/chat only.'
+            : 'POST /v1/ai/chat · composer unlocked while confirm pending'}
         </span>
         <Button type="submit" variant="accent" disabled={busy || !value.trim()}>
           Send

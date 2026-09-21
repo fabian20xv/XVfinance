@@ -1,5 +1,5 @@
 /**
- * POST /v1/chat — OpenAI-primary agent turn on the E0 listener.
+ * POST /v1/ai/chat — OpenAI-primary agent turn on the E0 listener (RFC-011).
  * Auth is the same bearer user JWT as POST /v1/tools.
  */
 import { runChatTurn, assertChatProviderReady } from '../ai/runtime/turn.js';
