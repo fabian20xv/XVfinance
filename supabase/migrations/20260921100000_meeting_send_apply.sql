@@ -1,8 +1,9 @@
 -- XVfinance — wire meeting_send into proposal confirm/apply (fail-closed)
--- Apply on the E0 allowlist only (both refs; refuse any third project):
+-- Matching migration for BOTH E0 allowlisted refs (refuse any third project):
 --   1. Develop/staging (Tess Preview): https://bkwhqfkosxnoffpsjcug.supabase.co (ref bkwhqfkosxnoffpsjcug)
 --   2. Parent/prod:                    https://krcwpupbdizzjyydzaqp.supabase.co (ref krcwpupbdizzjyydzaqp)
--- Not parent-only. Tess A→G on develop Preview needs meeting_send apply on confirm.
+-- Same file on both. Not parent-only. Operators apply; this PR does not push to parent DB.
+-- Tess A→G on develop Preview needs meeting_send apply on confirm.
 --
 -- BUG-F5: confirm_proposal returned 200 with status=failed and
 --   unsupported proposal kind meeting_send

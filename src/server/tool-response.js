@@ -2,7 +2,7 @@
  * Finish a successful tool dispatch: attach audit_id, never 500 after a
  * committed proposal confirm/reject mutate (BUG-2).
  */
-import { asAuditEntityId } from '../audit/entity-id.js';
+import { coerceAuditEntityId } from '../audit/entity-id.js';
 
 export const PROPOSAL_LIFECYCLE_ACTIONS = Object.freeze([
   'proposal.confirmed',
@@ -43,11 +43,11 @@ export async function completeToolSuccess({ result, session, writeAudit, env }) 
       actorId: session.userId,
       action: audit.action,
       entityTable: audit.entityTable,
-      entityId: asAuditEntityId(audit.entityId),
+      entityId: coerceAuditEntityId(audit.entityId),
       payload: {
         tool: audit.action,
         role: session.role,
-        entity_id: asAuditEntityId(audit.entityId),
+        entity_id: coerceAuditEntityId(audit.entityId),
         sensitive: Boolean(audit.sensitive),
       },
     });

@@ -18,7 +18,7 @@ describe('BUG-F5 meeting_send confirm apply', () => {
     assert.match(migration, /https:\/\/bkwhqfkosxnoffpsjcug\.supabase\.co/);
     assert.match(migration, /krcwpupbdizzjyydzaqp/);
     assert.match(migration, /https:\/\/krcwpupbdizzjyydzaqp\.supabase\.co/);
-    assert.match(migration, /Apply on the E0 allowlist only/);
+    assert.match(migration, /Matching migration for BOTH/);
     assert.match(migration, /refuse any third project/);
     assert.match(migration, /Not parent-only/);
     assert.doesNotMatch(migration, /Target ONLY https:\/\/krcwpupbdizzjyydzaqp/);

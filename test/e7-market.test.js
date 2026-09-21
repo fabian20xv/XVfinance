@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { dispatchTool, listToolNames } from '../src/chat/tool-router.js';
-import { asAuditEntityId } from '../src/audit/entity-id.js';
+import { asAuditEntityId, marketInstrumentEntityId } from '../src/audit/entity-id.js';
 import { createMarketProvider, StubMarketProvider, hasLiveMarketKey } from '../src/market/provider.js';
 import { completeToolSuccess } from '../src/server/tool-response.js';
-import { SMOKE_FIRM_ID, SMOKE_MANAGER_ID } from '../src/db/smoke-ids.js';
+import { SMOKE_FIRM_ID, SMOKE_INSTRUMENT_ID, SMOKE_MANAGER_ID } from '../src/db/smoke-ids.js';
+import { createMemoryClient } from './helpers/memory-client.js';
 
 const env = {
   SUPABASE_URL: 'https://krcwpupbdizzjyydzaqp.supabase.co',
@@ -75,17 +76,22 @@ describe('CA-7 market read tools', () => {
     const fundamentals = await run('get_fundamentals', { symbol: 'AAPL' });
     const news = await run('get_news_headlines', { symbol: 'MSFT' });
     const search = await run('search_instruments', { q: 'SPY' });
+    const namespacedSpy = marketInstrumentEntityId({ symbol: 'SPY' });
 
-    for (const result of [quote, fundamentals, news, search]) {
+    assert.equal(marketInstrumentEntityId({ symbol: 'spy' }), namespacedSpy);
+    assert.equal(asAuditEntityId(namespacedSpy), namespacedSpy);
+    assert.notEqual(namespacedSpy, 'SPY');
+
+    for (const result of [quote, fundamentals, news]) {
       assert.equal(result.ok, true);
-      assert.equal(asAuditEntityId(result.audit.entityId), result.audit.entityId ?? null);
+      assert.equal(asAuditEntityId(result.audit.entityId), result.audit.entityId);
       assert.notEqual(result.audit.entityId, 'SPY');
-      assert.notEqual(result.audit.entityId, 'AAPL');
-      assert.notEqual(result.audit.entityId, 'MSFT');
-      if (result.data.symbol) {
-        assert.notEqual(String(result.audit.entityId ?? '').toUpperCase(), result.data.symbol);
-      }
+      assert.notEqual(result.audit.entityId, result.data.symbol);
     }
+    assert.equal(quote.audit.entityId, namespacedSpy);
+    assert.equal(search.ok, true);
+    assert.equal(asAuditEntityId(search.audit.entityId), search.audit.entityId ?? null);
+    assert.notEqual(search.audit.entityId, 'SPY');
 
     const writes = [];
     const completed = await completeToolSuccess({
@@ -97,7 +103,24 @@ describe('CA-7 market read tools', () => {
       },
     });
     assert.equal(completed.status, 200);
-    assert.equal(writes[0].entityId, null);
+    assert.equal(writes[0].entityId, namespacedSpy);
     assert.notEqual(writes[0].entityId, 'SPY');
+  });
+
+  it('audits the firm instrument UUID when the symbol is in instruments', async () => {
+    const client = createMemoryClient({
+      instruments: [{ id: SMOKE_INSTRUMENT_ID, firm_id: SMOKE_FIRM_ID, symbol: 'SPY' }],
+    });
+    const quote = await dispatchTool({
+      name: 'get_quote',
+      args: { symbol: 'SPY' },
+      session,
+      userJwt: 'user-jwt',
+      env,
+      createUserClient: () => client,
+    });
+    assert.equal(quote.ok, true);
+    assert.equal(quote.data.instrument_id, SMOKE_INSTRUMENT_ID);
+    assert.equal(quote.audit.entityId, SMOKE_INSTRUMENT_ID);
   });
 });

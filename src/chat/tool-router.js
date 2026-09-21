@@ -2,7 +2,7 @@
  * Chat tool router: allowlist + JSON Schema + user-JWT client (RLS).
  * Never imports server/service-role modules.
  */
-import { asAuditEntityId } from '../audit/entity-id.js';
+import { coerceAuditEntityId } from '../audit/entity-id.js';
 import { assertAllowedSupabaseUrl } from '../config/supabase-lock.js';
 import {
   assertNoServiceRoleEnv,
@@ -90,7 +90,7 @@ function resolveAudit(spec, { args, data, session }) {
   const raw = hasEntityId ? audit.entityId : (data?.id ?? session.userId);
   return {
     ...audit,
-    entityId: asAuditEntityId(raw),
+    entityId: coerceAuditEntityId(raw),
   };
 }
 

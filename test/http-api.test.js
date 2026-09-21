@@ -691,12 +691,11 @@ describe('CA-2 HTTP API', () => {
         assert.equal(audits.length, 3);
         for (const event of audits) {
           assert.notEqual(event.entityId, 'SPY');
-          if (event.entityId != null) {
-            assert.match(
-              String(event.entityId),
-              /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-            );
-          }
+          assert.ok(event.entityId);
+          assert.match(
+            String(event.entityId),
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+          );
         }
       }
     );
