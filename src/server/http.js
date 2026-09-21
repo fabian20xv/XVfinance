@@ -1,11 +1,12 @@
 /**
- * Node HTTP API: JWT session + tool router + audit writer + proposals + Tess health/smoke.
+ * Node HTTP API: JWT session + tool router + audit writer + proposals + Tess health/smoke + E11 chat.
  */
 import { createServer } from 'node:http';
 import { createUserScopedClient } from '../chat/user-client.js';
 import { boot } from '../config/startup.js';
 import { isProductionEnv, resolveAppEnv, resolveCommitSha } from '../config/runtime-env.js';
 import { dispatchTool } from '../chat/tool-router.js';
+import { createOpenAIProvider, formatSse, runChatTurn } from '../ai/runtime/index.js';
 import { writeAuditEvent } from './audit.js';
 import { ApiError } from './errors.js';
 import { completeToolSuccess } from './tool-response.js';
@@ -29,6 +30,7 @@ const ERROR_STATUS = {
   forbidden: 403,
   role_required: 403,
   expired: 409,
+  timeout: 408,
   conflict: 409,
   apply_failed: 409,
   unmatched_symbols: 409,
@@ -36,6 +38,10 @@ const ERROR_STATUS = {
   not_sent: 409,
   unauthenticated: 401,
   invalid_args: 400,
+  model_unavailable: 503,
+  model_http_error: 503,
+  model_empty: 503,
+  confirm_required: 409,
 };
 
 function send(res, status, body) {
@@ -122,6 +128,9 @@ export function createRequestListener({ env = process.env, deps = {} } = {}) {
     dispatch: deps.dispatch ?? dispatchTool,
     writeAudit: deps.writeAudit ?? writeAuditEvent,
     createUserClient: deps.createUserClient ?? createUserScopedClient,
+    runChatTurn: deps.runChatTurn ?? runChatTurn,
+    chatProvider: deps.chatProvider,
+    createChatProvider: deps.createChatProvider ?? createOpenAIProvider,
   };
 
   return async function listener(req, res) {
@@ -302,11 +311,130 @@ export function createRequestListener({ env = process.env, deps = {} } = {}) {
         return;
       }
 
+      if (req.method === 'POST' && path === '/v1/chat') {
+        await runChatRequest(req, res, resolved);
+        return;
+      }
+
       send(res, 404, { ok: false, error: { code: 'not_found', message: 'Not found' } });
     } catch (err) {
       sendError(res, err);
     }
   };
+}
+
+function wantsChatStream(req, body) {
+  if (body && Object.prototype.hasOwnProperty.call(body, 'stream')) {
+    return Boolean(body.stream);
+  }
+  const accept = String(req.headers?.accept || '');
+  return accept.includes('text/event-stream');
+}
+
+function writeSse(res, type, data) {
+  res.write(formatSse(type, data));
+}
+
+async function auditedDispatch(deps, payload) {
+  const result = await deps.dispatch({
+    name: payload.name,
+    args: payload.args ?? {},
+    session: payload.session,
+    userJwt: payload.userJwt,
+    env: deps.env,
+    tools: payload.tools,
+    createUserClient: payload.createUserClient,
+  });
+  if (!result.ok) {
+    return result;
+  }
+  const completed = await completeToolSuccess({
+    result,
+    session: payload.session,
+    writeAudit: deps.writeAudit,
+    env: deps.env,
+  });
+  return {
+    ok: true,
+    data: completed.body.data,
+    audit_id: completed.body.audit_id,
+    audit: result.audit,
+  };
+}
+
+async function runChatRequest(req, res, deps) {
+  const { token, session } = await authenticate(req, deps);
+  const body = await readJsonBody(req);
+  const message =
+    typeof body?.message === 'string'
+      ? body.message
+      : typeof body?.content === 'string'
+        ? body.content
+        : '';
+  const messages = Array.isArray(body?.messages) ? body.messages : [];
+  const stream = wantsChatStream(req, body);
+  const provider =
+    deps.chatProvider ??
+    deps.createChatProvider({
+      env: deps.env,
+    });
+
+  const turnOptions = {
+    message: message || undefined,
+    messages,
+    session,
+    userJwt: token,
+    env: deps.env,
+    provider,
+    dispatch: (payload) =>
+      auditedDispatch(deps, {
+        ...payload,
+        session,
+        userJwt: token,
+      }),
+  };
+
+  if (stream) {
+    res.writeHead(200, {
+      'content-type': 'text/event-stream; charset=utf-8',
+      'cache-control': 'no-store',
+      connection: 'keep-alive',
+      'x-accel-buffering': 'no',
+    });
+    if (typeof res.flushHeaders === 'function') {
+      res.flushHeaders();
+    }
+    const turn = await deps.runChatTurn({
+      ...turnOptions,
+      onEvent: (event) => writeSse(res, event.type, event.data),
+    });
+    if (!turn.events?.some((event) => event.type === 'done')) {
+      writeSse(res, 'done', {
+        ok: turn.ok,
+        finish_reason: turn.finish_reason,
+        message: turn.message,
+        tool_calls: turn.tool_calls,
+        proposals: turn.proposals,
+        error: turn.error,
+      });
+    }
+    res.end();
+    return;
+  }
+
+  const turn = await deps.runChatTurn(turnOptions);
+  const status = turn.ok ? 200 : (ERROR_STATUS[turn.error?.code] ?? ERROR_STATUS[turn.finish_reason] ?? 400);
+  send(res, status, {
+    ok: turn.ok,
+    data: {
+      message: turn.message,
+      events: turn.events,
+      tool_calls: turn.tool_calls,
+      proposals: turn.proposals,
+      finish_reason: turn.finish_reason,
+    },
+    error: turn.error,
+  });
 }
 
 async function finishTool(res, result, session, deps) {

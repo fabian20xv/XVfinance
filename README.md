@@ -36,9 +36,10 @@ The service-role key is a server secret. It must never reach the model, the chat
 | --- | --- |
 | `src/server/` (e.g. `service-role.js`) | Yes — only locked-down server modules |
 | `src/chat/` (tool runner + user-JWT client) | No — user JWT + anon/publishable key; env is stripped |
+| `src/ai/` (prompts / runtime / tools) | No — adapters call `dispatchTool`; OpenAI key is server env only, never service-role |
 | `src/client/` | No — public URL + anon/publishable key only |
 
-`createChatToolRunner` builds a frozen env **without** service-role secrets and requires a user JWT so RLS applies. ESLint rule `xvfinance/no-service-role-in-chat` (chat + client files) and `test/service-role-isolation.test.js` fail if those trees read the key or import `src/server`. The service-role key lives only in `src/server/service-role.js`. Tess smoke uses the user-JWT client so RLS applies.
+`createChatToolRunner` builds a frozen env **without** service-role secrets and requires a user JWT so RLS applies. ESLint rule `xvfinance/no-service-role-in-chat` (chat + AI + client files) and `test/service-role-isolation.test.js` fail if those trees read the key or import `src/server`. The service-role key lives only in `src/server/service-role.js`. Tess smoke uses the user-JWT client so RLS applies.
 
 ## Tess health / smoke (E0 HTTP API)
 
@@ -133,6 +134,7 @@ npm start   # node src/index.js --serve  (requires SUPABASE_URL; PORT default 87
 # GET  /health          — no JWT
 # GET  /v1/session      — Authorization: Bearer <user jwt>
 # POST /v1/tools        — { "name": "get_session"|"health", "args": {} }
+# POST /v1/chat         — { "message": "…", "stream": true }  (SSE or JSON events; same E2 allowlist)
 # GET  /v1/proposals
 # GET  /v1/proposals/:id
 # GET  /v1/proposals/:id/confirm-card
@@ -230,19 +232,36 @@ Next.js App Router UI at `app/` (same repo as the Node `/v1` server). Design pac
 | Confirm pulse | ConfirmCard + DiffConfirmPanel share `proposal_id`. Select/focus (never hover) inhales both borders once (600ms ease-out). Primary **Confirm change**; secondary **Dismiss proposal**. Success: **Confirmed · {time} · you**, then fade ~1.2s. `POST /v1/proposals/:id/confirm` / `reject` |
 | Scratchpad | Veil over the right pane only (not a tab). Diagonal **DRAFT · what-if** at 8–12%. Subline: **Won’t change positions until you confirm.** `GET /v1/scratchpads/:id/impact`. Promote → `scratchpad_promote` manager dual-confirm. ConfirmCard is absent while the veil is open. Success dissolves upward; fail keeps the watermark and toasts **Not applied — still draft.** Discard dissolves in 200ms with no source-of-truth persist |
 | Receipts | Marks **[1]** (not “citation”). Side-slip popover beside the mark (120–160ms fade + 2px rise). Title is source type + relative time; one factual body line; **Open in workspace** only when `path` is present. Missing/RLS → dashed **[?]** **Not available for this account**. `public_url` is always `null`. Email/Export → `propose_meeting_send` |
-| Composer | Stays unlocked while confirm is pending. Dispatches allowlisted `POST /v1/tools` (no invented model chat API) |
+| Composer | Stays unlocked while confirm is pending. `POST /v1/chat` agent turns (OpenAI-primary). Slash/JSON still hit the same E2 tool allowlist — no second list. Writes stay pending until ConfirmCard / DiffConfirmPanel (same `proposal_id`). |
 | SpeakReadyToggle | Deferred to epic 1.5 (file kept, not mounted) |
 
 Out of scope: CRM, optimizer, news firehose, scenario libraries, dark mode.
 
 Preview/dev web env may use develop ref `bkwhqfkosxnoffpsjcug`. Production must use parent `krcwpupbdizzjyydzaqp`.
 
+## Agent chat runtime (E11)
+
+`src/ai/{prompts,runtime,tools}/` is the PM agent. Tools are thin adapters over `src/chat/tool-router.js` (`TOOL_ALLOWLIST`). The model never gets a service-role key; `src/ai` cannot import `src/server`.
+
+| Ticket | What shipped |
+| --- | --- |
+| Prompts | PM system prompt + confirm-on-write rules + top-10 IM jobs brief (aligned with Tess `TESS_TOP_10_JOBS`) |
+| Tools | `openaiToolsFromAllowlist(TOOL_ALLOWLIST)` — same names/schemas as `POST /v1/tools` |
+| Runtime | OpenAI-primary turn loop (`OPENAI_API_KEY`, default `gpt-4o-mini`), tool calling, turn/tool timeouts, streaming-friendly events (`text_delta` / `tool_call` / `tool_result` / `proposal` / `done`) |
+| HTTP | `POST /v1/chat` `{ message, messages?, stream? }` — SSE when `stream: true` or `Accept: text/event-stream`; JSON otherwise |
+| Confirm-on-write | `propose_*` stays `pending` until ConfirmCard + DiffConfirmPanel (same `proposal_id`). The agent does not auto-call `confirm_proposal` / `reject_proposal` unless the user explicitly confirms |
+| Degrade | Missing/placeholder `OPENAI_API_KEY` → natural-language turns return `model_unavailable`; slash/JSON tools still run |
+
+```bash
+# POST /v1/chat     — Authorization: Bearer <user jwt>
+```
+
 ## Setup
 
 ```bash
 cp .env.example .env   # placeholders only; never commit real keys
 npm install
-npm run ci             # lock assert + lint + tests (E0–E10)
+npm run ci             # lock assert + lint + tests (E0–E11)
 # Server-only, locked project only (requires real SUPABASE_SERVICE_ROLE_KEY):
 npm run seed                    # parent/prod smoke fixture only
 npm run seed:tess -- --dry-run  # develop URL guard; no writes
@@ -259,7 +278,7 @@ node --env-file=.env src/index.js --serve
 # or: npm start
 ```
 
-The API still listens on `PORT` (default `8787`). It is unchanged: health, smoke, `/v1/session`, `/v1/tools`, proposals, scratchpad impact, meeting receipts.
+The API still listens on `PORT` (default `8787`). Health, smoke, `/v1/session`, `/v1/tools`, `/v1/chat`, proposals, scratchpad impact, meeting receipts.
 
 Start the E10 web shell (App Router). Next.js also serves `/v1`, `/health`, `/api/health`, and `/api/smoke` through the same `createRequestListener`, so `npm run web` is enough for local UI + API. Keep `npm start` when you want the Node listener alone:
 

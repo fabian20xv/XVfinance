@@ -16,7 +16,7 @@ export default [
     },
   },
   {
-    files: ['src/chat/**/*.js', 'src/client/**/*.js'],
+    files: ['src/chat/**/*.js', 'src/client/**/*.js', 'src/ai/**/*.js'],
     plugins: { xvfinance },
     rules: {
       'xvfinance/no-service-role-in-chat': 'error',

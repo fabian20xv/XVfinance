@@ -26,7 +26,7 @@ export function Composer({
       <textarea
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        placeholder="Allowlisted tool: /get_session_context or {&quot;name&quot;:&quot;list_clients&quot;,&quot;args&quot;:{}}"
+        placeholder="Ask the PM agent, or /list_clients {json}"
         disabled={false}
         aria-disabled={false}
         data-unlocked-during-confirm={pendingConfirm ? 'true' : 'false'}
@@ -40,8 +40,8 @@ export function Composer({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
         <span style={{ fontSize: 11, color: 'var(--ink-muted)' }}>
           {pendingConfirm
-            ? 'Confirm pending — composer stays unlocked. No model endpoint in E0–E9; tools only.'
-            : 'POST /v1/tools · composer unlocked while confirm pending'}
+            ? 'Confirm pending — composer stays unlocked. Writes wait on Confirm change.'
+            : 'POST /v1/chat · same E2 allowlist · composer unlocked while confirm pending'}
         </span>
         <Button type="submit" variant="accent" disabled={busy || !value.trim()}>
           Send

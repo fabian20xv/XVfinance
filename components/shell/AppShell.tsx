@@ -19,7 +19,7 @@ import { EmptyWorkspace } from '@/components/workspace/EmptyWorkspace';
 import { HoldingsTable, type CashStrip, type HoldingRow } from '@/components/workspace/HoldingsTable';
 import { ReportDraftView, type ReportDraft } from '@/components/workspace/ReportDraftView';
 import { WorkspaceHeader } from '@/components/workspace/WorkspaceHeader';
-import { callTool, v1Fetch } from '@/lib/api';
+import { callTool, postChat, v1Fetch } from '@/lib/api';
 import { actionPath, assertSharedProposalId } from '@/src/web/dual-confirm.js';
 import { MOTION, SPLIT } from '@/src/web/tokens.js';
 import { parseComposerInput } from '@/src/web/parse-composer.js';
@@ -239,63 +239,16 @@ export function AppShell({
 
   const pushMessage = (message: ChatMessage) => setMessages((list) => [...list, message]);
 
-  const onSubmitComposer = async () => {
-    const parsed = parseComposerInput(composer);
-    if (parsed.type === 'empty') {
-      return;
+  const applyToolPayload = (
+    name: string | undefined,
+    ok: boolean,
+    data: Record<string, unknown> | undefined
+  ) => {
+    if (data) {
+      attachProposal(data);
     }
-    const text = composer;
-    setComposer('');
-    pushMessage({ id: newId(), role: 'user', text });
-    if (parsed.type === 'invalid_json') {
-      pushMessage({ id: newId(), role: 'assistant', text: parsed.message });
-      return;
-    }
-    if (parsed.type === 'message') {
-      pushMessage({
-        id: newId(),
-        role: 'assistant',
-        text: 'No model chat endpoint in E0–E9. Dispatch an allowlisted tool with /tool_name {json} or {"name","args"}.',
-      });
-      return;
-    }
-    const runningId = newId();
-    pushMessage({
-      id: runningId,
-      role: 'tool',
-      text: `POST /v1/tools ${parsed.name}`,
-      toolName: parsed.name,
-      toolStatus: 'running',
-    });
-    setBusy(true);
-    const result = await runTool(parsed.name, parsed.args);
-    setBusy(false);
-    const data = result.data as Record<string, unknown> | undefined;
-    attachProposal(data);
-    const pending = Boolean(
-      data &&
-        ((data.confirm_card as ConfirmCardModel | undefined)?.status === 'pending' ||
-          data.status === 'pending' ||
-          (data.ui === 'chat.confirm_card' && data.status === 'pending'))
-    );
-    setMessages((list) =>
-      list.map((row) =>
-        row.id === runningId
-          ? {
-              ...row,
-              toolStatus: result.ok ? (pending ? 'pending_confirm' : 'ok') : 'error',
-              text: result.ok
-                ? JSON.stringify(result.data, null, 2)
-                : result.error?.message ?? 'Tool failed',
-              confirmCard:
-                (data?.confirm_card as ConfirmCardModel | undefined) ??
-                (data?.ui === 'chat.confirm_card' ? (data as ConfirmCardModel) : undefined),
-            }
-          : row
-      )
-    );
-    if (parsed.name === 'get_meeting_one_pager') {
-      if (result.ok && data) {
+    if (name === 'get_meeting_one_pager' || name === 'ghostwrite_meeting_one_pager') {
+      if (ok && data) {
         setMeetingMissing(false);
         setMeeting(data as MeetingReport);
         setWorkspaceMode('meeting');
@@ -305,9 +258,129 @@ export function AppShell({
         setWorkspaceMode('meeting');
       }
     }
-    if (parsed.name === 'get_report' && result.ok && data) {
+    if (name === 'get_report' && ok && data) {
       setReport(data as ReportDraft);
       setWorkspaceMode('report');
+    }
+  };
+
+  const onSubmitComposer = async () => {
+    const parsed = parseComposerInput(composer);
+    if (parsed.type === 'empty') {
+      return;
+    }
+    const text = composer;
+    setComposer('');
+    pushMessage({ id: newId(), role: 'user', text });
+    const history = messages
+      .filter((row) => row.role === 'user' || row.role === 'assistant')
+      .slice(-12)
+      .map((row) => ({ role: row.role, content: row.text.slice(0, 4000) }));
+    const assistantId = newId();
+    const toolQueue: string[] = [];
+    pushMessage({
+      id: assistantId,
+      role: 'assistant',
+      text: parsed.type === 'tool' ? '' : '…',
+    });
+    setBusy(true);
+    const result = await postChat({
+      token,
+      firmId,
+      message: text,
+      messages: history,
+      stream: true,
+      onEvent: (event) => {
+        const data = event.data as Record<string, unknown> | undefined;
+        if (event.type === 'tool_call') {
+          const name = String(data?.name ?? 'tool');
+          const id = newId();
+          toolQueue.push(id);
+          pushMessage({
+            id,
+            role: 'tool',
+            text: `tool ${name}`,
+            toolName: name,
+            toolStatus: 'running',
+          });
+          return;
+        }
+        if (event.type === 'tool_result') {
+          const name = String(data?.name ?? 'tool');
+          const id = toolQueue.shift();
+          const ok = data?.ok !== false;
+          const payload = (data?.data as Record<string, unknown> | undefined) ?? undefined;
+          const pending = Boolean(
+            payload &&
+              ((payload.confirm_card as ConfirmCardModel | undefined)?.status === 'pending' ||
+                payload.status === 'pending')
+          );
+          applyToolPayload(name, ok, payload);
+          if (data?.proposal_id && data.confirm_card) {
+            attachProposal(data as Record<string, unknown>);
+          }
+          setMessages((list) =>
+            list.map((row) =>
+              row.id === id
+                ? {
+                    ...row,
+                    toolStatus: ok ? (pending ? 'pending_confirm' : 'ok') : 'error',
+                    text: ok
+                      ? JSON.stringify(payload ?? data, null, 2)
+                      : String((data?.error as { message?: string } | undefined)?.message ?? 'Tool failed'),
+                    confirmCard:
+                      (payload?.confirm_card as ConfirmCardModel | undefined) ??
+                      (payload?.ui === 'chat.confirm_card' ? (payload as ConfirmCardModel) : undefined),
+                  }
+                : row
+            )
+          );
+          return;
+        }
+        if (event.type === 'proposal') {
+          attachProposal(data as Record<string, unknown>);
+          return;
+        }
+        if (event.type === 'text_delta') {
+          const delta = String(data?.text ?? '');
+          if (!delta) {
+            return;
+          }
+          setMessages((list) =>
+            list.map((row) =>
+              row.id === assistantId
+                ? { ...row, text: row.text === '…' ? delta : `${row.text}${delta}` }
+                : row
+            )
+          );
+          return;
+        }
+        if (event.type === 'error') {
+          const message = String((data as { message?: string } | undefined)?.message ?? 'Chat turn failed');
+          setMessages((list) =>
+            list.map((row) => (row.id === assistantId ? { ...row, text: message } : row))
+          );
+        }
+      },
+    });
+    setBusy(false);
+    if (result.data?.message) {
+      setMessages((list) =>
+        list.map((row) =>
+          row.id === assistantId && (row.text === '…' || row.text === '')
+            ? { ...row, text: result.data?.message ?? '' }
+            : row
+        )
+      );
+    }
+    if (!result.ok && result.error?.message) {
+      setMessages((list) =>
+        list.map((row) =>
+          row.id === assistantId && (row.text === '…' || row.text === '')
+            ? { ...row, text: result.error?.message ?? 'Chat turn failed' }
+            : row
+        )
+      );
     }
   };
 

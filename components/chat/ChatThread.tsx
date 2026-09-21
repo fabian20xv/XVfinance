@@ -52,7 +52,7 @@ export function ChatThread({
         {messages.length === 0 ? (
           <DashedEmptySlot
             label="No thread yet"
-            hint="Dispatch an allowlisted E0–E9 tool. There is no model chat endpoint in this repo."
+            hint="Ask the PM agent, or dispatch /tool_name. Writes stay pending until Confirm change."
           />
         ) : (
           messages.map((message) => (

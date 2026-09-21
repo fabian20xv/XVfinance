@@ -1,11 +1,12 @@
 /**
- * Composer talks to the existing E2 tool router. There is no model chat endpoint in E0–E9.
+ * Composer talks to POST /v1/chat (E11 agent turns). Slash/JSON still maps to
+ * the same E2 allowlist — the runtime short-circuits those without a second list.
  *
  * Accepted input:
  *   /tool_name
  *   /tool_name { "arg": "value" }
  *   { "name": "tool_name", "args": { } }
- * Anything else is a local thread message (not sent to an invented LLM API).
+ *   free text → model turn (OpenAI-primary; degrades if OPENAI_API_KEY is unset)
  */
 
 /**

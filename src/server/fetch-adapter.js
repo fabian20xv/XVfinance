@@ -1,6 +1,7 @@
 /**
  * Fetch (Web Request/Response) adapter around createRequestListener.
  * Lets the Next.js App Router serve the same E0 /v1 HTTP API without forking routes.
+ * Supports buffered JSON (`end` only) and SSE (`write` then `end`).
  */
 import { Readable } from 'node:stream';
 import { createRequestListener } from './http.js';
@@ -11,6 +12,22 @@ function headerMap(request) {
     headers[key.toLowerCase()] = value;
   }
   return headers;
+}
+
+function toUint8(chunk) {
+  if (chunk == null) {
+    return new Uint8Array();
+  }
+  if (typeof chunk === 'string') {
+    return new TextEncoder().encode(chunk);
+  }
+  if (chunk instanceof Uint8Array) {
+    return chunk;
+  }
+  if (Buffer.isBuffer(chunk)) {
+    return new Uint8Array(chunk);
+  }
+  return new TextEncoder().encode(String(chunk));
 }
 
 /**
@@ -39,32 +56,74 @@ export function createFetchHandler(options) {
       let status = 200;
       const headers = {};
       let ended = false;
+      let started = false;
+      let streamController = null;
+
+      function applyHeaders(hdrs) {
+        if (!hdrs || typeof hdrs !== 'object') {
+          return;
+        }
+        for (const [key, value] of Object.entries(hdrs)) {
+          headers[key] = value;
+        }
+      }
+
+      function startStream() {
+        if (started) {
+          return;
+        }
+        started = true;
+        const stream = new ReadableStream({
+          start(controller) {
+            streamController = controller;
+          },
+        });
+        resolve(new Response(stream, { status, headers }));
+      }
 
       const res = {
         writeHead(code, hdrs) {
           status = code;
-          if (hdrs && typeof hdrs === 'object') {
-            for (const [key, value] of Object.entries(hdrs)) {
-              headers[key] = value;
-            }
-          }
+          applyHeaders(hdrs);
         },
         setHeader(key, value) {
           headers[key] = value;
+        },
+        flushHeaders() {
+          startStream();
+        },
+        write(chunk) {
+          startStream();
+          if (ended) {
+            return false;
+          }
+          streamController.enqueue(toUint8(chunk));
+          return true;
         },
         end(payload) {
           if (ended) {
             return;
           }
           ended = true;
-          const body = payload == null ? null : payload;
-          resolve(new Response(body, { status, headers }));
+          if (!started) {
+            started = true;
+            resolve(new Response(payload == null ? null : payload, { status, headers }));
+            return;
+          }
+          if (payload != null) {
+            streamController.enqueue(toUint8(payload));
+          }
+          streamController.close();
         },
       };
 
       Promise.resolve(listener(req, res)).catch((err) => {
-        if (!ended) {
+        if (!ended && !started) {
           reject(err);
+          return;
+        }
+        if (!ended && streamController) {
+          streamController.error(err);
         }
       });
     });

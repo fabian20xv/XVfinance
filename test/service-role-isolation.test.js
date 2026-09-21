@@ -16,7 +16,7 @@ import { createServiceRoleClient, getServiceRoleKey } from '../src/server/servic
 
 const LOCKED_URL = 'https://krcwpupbdizzjyydzaqp.supabase.co';
 const ROOT = join(import.meta.dirname, '..');
-const SCAN_DIRS = ['src/chat', 'src/client', 'src/web', 'app', 'components', 'lib'];
+const SCAN_DIRS = ['src/chat', 'src/client', 'src/web', 'src/ai', 'app', 'components', 'lib'];
 const SCAN_EXT = ['.js', '.ts', '.tsx', '.mjs'];
 const FORBIDDEN_IN_CHAT_CLIENT = [
   'SUPABASE_SERVICE_ROLE_KEY',

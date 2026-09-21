@@ -22,6 +22,15 @@ describe('CA-0.2 lint rule bans service-role in chat/client', () => {
     assert.match(messages, /Service-role|forbidden|Do not read service-role/i);
   });
 
+  it('flags the same leaks in src/ai runtime', async () => {
+    const eslint = createLinter();
+    const [result] = await eslint.lintText(
+      `export function leak() {\n  return process.env.SUPABASE_SERVICE_ROLE_KEY;\n}\n`,
+      { filePath: join(root, 'src/ai/runtime/evil.js') }
+    );
+    assert.ok(result.errorCount > 0, 'expected lint errors');
+  });
+
   it('flags importing the server service-role module from chat', async () => {
     const eslint = createLinter();
     const [result] = await eslint.lintText(
@@ -44,7 +53,7 @@ describe('CA-0.2 lint rule bans service-role in chat/client', () => {
 
   it('allows existing chat and client source', async () => {
     const eslint = createLinter();
-    const results = await eslint.lintFiles(['src/chat/**/*.js', 'src/client/**/*.js']);
+    const results = await eslint.lintFiles(['src/chat/**/*.js', 'src/client/**/*.js', 'src/ai/**/*.js']);
     const errorCount = results.reduce((sum, r) => sum + r.errorCount, 0);
     assert.equal(
       errorCount,
