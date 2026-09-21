@@ -597,3 +597,26 @@ body {
 .composer textarea:disabled {
   opacity: 0.45;
 }
+
+.stream-caret {
+  display: inline-block;
+  width: 7px;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: -2px;
+  background: var(--accent);
+  border-radius: 1px;
+  animation: stream-caret 1.05s steps(1);
+  animation-iteration-count: 120;
+}
+
+@keyframes stream-caret {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}

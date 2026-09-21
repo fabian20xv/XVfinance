@@ -17,6 +17,32 @@ export type ConfirmCardModel = {
   actions?: Array<{ action: string; method?: string; path?: string }>;
 };
 
+function roleLabel(role?: string | null) {
+  if (role === 'manager') {
+    return 'Manager';
+  }
+  if (role === 'any_member') {
+    return 'Any member';
+  }
+  return role || null;
+}
+
+function expiresLabel(iso?: string | null) {
+  if (!iso) {
+    return null;
+  }
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 export function ConfirmCard({
   card,
   highlighted,
@@ -46,7 +72,8 @@ export function ConfirmCard({
   const pending = fields.status === 'pending' || fields.status === 'pending_confirm';
   const confirmed = outcome?.status === 'confirmed' && outcome.proposalId === proposalId;
   const select = () => onSelect?.(proposalId);
-  const badgeTone = confirmed ? 'success' : pending ? 'default' : 'default';
+  const role = roleLabel(fields.requires_role);
+  const expires = expiresLabel(fields.expires_at);
 
   return (
     <article
@@ -68,41 +95,14 @@ export function ConfirmCard({
     >
       <header style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <strong style={{ fontSize: 13 }}>{fields.preview?.title ?? fields.kind}</strong>
-        <Badge tone={badgeTone}>{confirmed ? 'confirmed' : fields.status}</Badge>
-        <Badge>{fields.requires_role}</Badge>
+        {role ? <Badge>{role}</Badge> : null}
       </header>
       {fields.preview?.summary ? (
         <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-muted)' }}>{fields.preview.summary}</p>
       ) : null}
-      <dl
-        style={{
-          margin: 0,
-          display: 'grid',
-          gridTemplateColumns: 'auto 1fr',
-          gap: '4px 12px',
-          fontSize: 12,
-          color: 'var(--ink-muted)',
-        }}
-      >
-        <dt>proposal_id</dt>
-        <dd className="tabular" style={{ margin: 0 }}>
-          {proposalId}
-        </dd>
-        <dt>kind</dt>
-        <dd style={{ margin: 0 }}>{fields.kind}</dd>
-        <dt>status</dt>
-        <dd style={{ margin: 0 }}>{confirmed ? 'confirmed' : fields.status}</dd>
-        <dt>db_status</dt>
-        <dd style={{ margin: 0 }}>{fields.db_status}</dd>
-        <dt>requires_role</dt>
-        <dd style={{ margin: 0 }}>{fields.requires_role}</dd>
-        <dt>expires_at</dt>
-        <dd className="tabular" style={{ margin: 0 }}>
-          {fields.expires_at ?? '—'}
-        </dd>
-        <dt>idempotency_key</dt>
-        <dd style={{ margin: 0 }}>{fields.idempotency_key ?? '—'}</dd>
-      </dl>
+      {expires ? (
+        <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-muted)' }}>Expires {expires}</p>
+      ) : null}
       <ConfirmActions
         pending={pending}
         canConfirm={canConfirm}

@@ -408,8 +408,9 @@ describe('E11 src/ai isolation', () => {
     assert.match(api, /fetch\('\/v1\/ai\/chat'/);
     assert.equal(api.includes("fetch('/v1/chat'"), false);
     const composer = readFileSync(join(ROOT, 'components/chat/Composer.tsx'), 'utf8');
-    assert.match(composer, /\/v1\/ai\/chat/);
+    assert.equal(composer.includes('/v1/ai/chat'), false);
     assert.equal(composer.includes('/v1/tools'), false);
+    assert.match(composer, /Enter to send/);
     const shell = readFileSync(join(ROOT, 'components/shell/AppShell.tsx'), 'utf8');
     assert.match(shell, /streamChatTurn/);
     assert.equal(shell.includes('POST /v1/tools'), false);

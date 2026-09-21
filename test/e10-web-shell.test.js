@@ -257,6 +257,9 @@ describe('E10 Dana v1.2 split-screen shell', () => {
     assert.match(card, /confirm-pulse/);
     assert.equal(card.includes('onMouseEnter'), false);
     assert.equal(card.includes('onHover'), false);
+    assert.equal(card.includes('<dt>'), false);
+    assert.equal(card.includes('<dl'), false);
+    assert.match(card, /Expires/);
     const actions = read('components/chat/ConfirmActions.tsx');
     assert.match(actions, /CONFIRM_COPY/);
     assert.match(actions, /confirmedLine/);
@@ -266,8 +269,18 @@ describe('E10 Dana v1.2 split-screen shell', () => {
     assert.equal(panel.includes('onMouseEnter'), false);
     const composer = read('components/chat/Composer.tsx');
     assert.match(composer, /unlocked-during-confirm/);
-    assert.match(composer, /\/v1\/ai\/chat/);
+    assert.match(composer, /Enter to send/);
+    assert.match(composer, /Shift\+Enter/);
+    assert.equal(composer.includes('/v1/ai/chat'), false);
     assert.equal(composer.includes('/v1/tools'), false);
+    assert.equal(composer.includes('/get_session_context'), false);
+    const thread = read('components/chat/ChatThread.tsx');
+    assert.match(thread, /'You'/);
+    assert.match(thread, /'XV'/);
+    assert.match(thread, /stream-caret/);
+    assert.match(thread, /scrollHeight/);
+    assert.equal(thread.includes("role: 'tool'"), false);
+    assert.equal(thread.includes('{message.role}'), false);
     const veil = read('components/scratchpad/DraftVeil.tsx');
     assert.match(veil, /source-of-truth="false"/);
     const header = read('components/workspace/WorkspaceHeader.tsx');
@@ -286,6 +299,7 @@ describe('E10 Dana v1.2 split-screen shell', () => {
     assert.equal(footnote.includes('cited'), false);
     const shell = read('components/shell/AppShell.tsx');
     assert.match(shell, /streamChatTurn/);
+    assert.equal(shell.includes("role: 'tool'"), false);
     assert.match(read('lib/api.ts'), /\/v1\/ai\/chat/);
     assert.match(read('lib/api.ts'), /credentials: 'include'/);
     assert.equal(read('lib/api.ts').includes("fetch('/v1/chat'"), false);
@@ -308,6 +322,7 @@ describe('E10 Dana v1.2 split-screen shell', () => {
     assert.match(css, /veil-dissolve-up/);
     assert.match(css, /rotate\(-28deg\)/);
     assert.match(css, /translate\(8px, 2px\)/);
+    assert.match(css, /\.stream-caret/);
     assert.equal(css.includes('infinite'), false);
   });
 

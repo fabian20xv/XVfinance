@@ -292,36 +292,38 @@ export function AppShell({
           if (!event.name) {
             return;
           }
-          setMessages((list) => {
-            const existing = list.find((row) =>
-              row.role === 'tool' &&
-              (event.id ? row.toolId === event.id : row.toolName === event.name && row.toolStatus === 'running')
-            );
-            if (event.status === 'running' && !existing) {
-              return [
-                ...list,
-                {
-                  id: newId(),
-                  role: 'tool' as const,
-                  text: `tool ${event.name}`,
-                  toolName: event.name,
-                  toolId: event.id,
-                  toolStatus: 'running',
-                },
-              ];
-            }
-            return list.map((row) =>
-              row.role === 'tool' &&
-              (event.id ? row.toolId === event.id : row.toolName === event.name) &&
-              (row.toolStatus === 'running' || row.id === existing?.id)
-                ? {
-                    ...row,
-                    toolStatus: event.status ?? row.toolStatus,
-                    text: event.error?.message ?? row.text,
-                  }
-                : row
-            );
-          });
+          setMessages((list) =>
+            list.map((row) => {
+              if (row.id !== assistantId) {
+                return row;
+              }
+              const tools = [...(row.tools ?? [])];
+              const idx = tools.findIndex((tool) =>
+                event.id
+                  ? tool.id === event.id
+                  : tool.name === event.name && tool.status === 'running'
+              );
+              if (event.status === 'running' && idx === -1) {
+                tools.push({
+                  id: event.id,
+                  name: event.name,
+                  status: 'running',
+                });
+              } else if (idx >= 0) {
+                tools[idx] = {
+                  ...tools[idx],
+                  status: event.status ?? tools[idx].status,
+                };
+              } else if (event.status) {
+                tools.push({
+                  id: event.id,
+                  name: event.name,
+                  status: event.status,
+                });
+              }
+              return { ...row, tools };
+            })
+          );
         },
         onDone: (data) => {
           attachProposal({
@@ -351,12 +353,6 @@ export function AppShell({
           : {}),
       } as Record<string, unknown>;
       attachProposal(data);
-      const pending = Boolean(
-        result.confirm_card &&
-          typeof result.confirm_card === 'object' &&
-          ((result.confirm_card as ConfirmCardModel).status === 'pending' ||
-            (result.confirm_card as ConfirmCardModel).status === 'pending_confirm')
-      );
       setMessages((list) =>
         list.map((row) =>
           row.id === assistantId
@@ -364,7 +360,6 @@ export function AppShell({
                 ...row,
                 text: result.text || assembled || row.text,
                 confirmCard: (result.confirm_card as ConfirmCardModel | undefined) ?? undefined,
-                toolStatus: pending ? 'pending_confirm' : undefined,
               }
             : row
         )
