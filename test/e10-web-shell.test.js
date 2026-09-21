@@ -195,13 +195,20 @@ describe('E10 Dana v1.2 split-screen shell', () => {
     assert.equal(url.searchParams.get('xv_path'), null);
   });
 
-  it('vercel.json keeps API rewrites and does not swallow / for the App Router', () => {
+  it('vercel.json pins Next.js so App Router / is not a platform NOT_FOUND', () => {
     const config = JSON.parse(read('vercel.json'));
+    assert.equal(config.framework, 'nextjs');
+    assert.equal(config.buildCommand, 'next build');
     const sources = config.rewrites.map((rule) => rule.source);
     assert.ok(sources.includes('/v1/:path*'));
     assert.ok(sources.includes('/health'));
     assert.ok(sources.includes('/api/health'));
     assert.equal(sources.includes('/(.*)'), false);
+    assert.equal(sources.includes('/'), false);
+    const pkg = JSON.parse(read('package.json'));
+    assert.equal(pkg.scripts.build, 'next build');
+    assert.equal(existsSync(join(root, 'middleware.ts')), false);
+    assert.ok(existsSync(join(root, 'app/page.tsx')));
   });
 
   it('ships the Dana shell components and AuthGate', () => {

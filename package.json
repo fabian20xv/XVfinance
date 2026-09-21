@@ -9,6 +9,7 @@
   },
   "scripts": {
     "start": "node src/index.js --serve",
+    "build": "next build",
     "web": "next dev --port 3000",
     "web:build": "next build",
     "web:start": "next start --port 3000",
