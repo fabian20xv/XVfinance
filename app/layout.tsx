@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
-import { getPublicSupabaseConfig } from '@/src/client/public-config.js';
 import './globals.css';
 
 const inter = Inter({
@@ -14,7 +13,8 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  getPublicSupabaseConfig(process.env);
+  // Do not assert public Supabase config here. A throw in the root layout
+  // blanks the shell; AuthGate already surfaces missing/invalid public env.
   return (
     <html lang="en">
       <body className={`${inter.className} app-root antialiased`}>{children}</body>
