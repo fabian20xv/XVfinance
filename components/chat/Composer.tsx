@@ -33,7 +33,9 @@ export function Composer({
         onKeyDown={(event) => {
           if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
             event.preventDefault();
-            onSubmit();
+            if (!busy && value.trim()) {
+              onSubmit();
+            }
           }
         }}
       />

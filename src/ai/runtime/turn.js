@@ -216,6 +216,7 @@ export async function runChatTurn({
             (result.data.ui === 'chat.confirm_card' && result.data.status === 'pending'))
       );
       const status = result?.ok ? (pending ? 'pending_confirm' : 'ok') : 'error';
+      const ui = result?.ok ? extractProposalUi(result.data) : { confirm_card: null, workspace_panel: null };
       emit({
         event: 'tool',
         data: {
@@ -224,6 +225,8 @@ export async function runChatTurn({
           id: call.id,
           ok: Boolean(result?.ok),
           error: result?.error,
+          ...(ui.confirm_card ? { confirm_card: ui.confirm_card } : {}),
+          ...(ui.workspace_panel ? { workspace_panel: ui.workspace_panel } : {}),
         },
       });
       toolTrace.push({

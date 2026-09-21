@@ -287,6 +287,7 @@ describe('E10 Dana v1.2 split-screen shell', () => {
     const shell = read('components/shell/AppShell.tsx');
     assert.match(shell, /streamChatTurn/);
     assert.match(read('lib/api.ts'), /\/v1\/ai\/chat/);
+    assert.match(read('lib/api.ts'), /credentials: 'include'/);
     assert.equal(read('lib/api.ts').includes("fetch('/v1/chat'"), false);
     assert.equal(shell.includes('SpeakReadyToggle'), false);
     assert.match(shell, /hideConfirmCard=\{scratchpad\.open\}/);

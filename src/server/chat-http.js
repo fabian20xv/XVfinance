@@ -31,10 +31,11 @@ export function writeSse(res, event, data) {
 function startSse(res) {
   res.writeHead(200, {
     'content-type': 'text/event-stream; charset=utf-8',
-    'cache-control': 'no-store',
+    'cache-control': 'no-cache, no-transform',
     connection: 'keep-alive',
     'x-accel-buffering': 'no',
   });
+  res.flushHeaders?.();
 }
 
 /**
@@ -53,6 +54,15 @@ export async function handleV1Chat({ req, res, body, token, session, deps, send 
 
   const stream = wantsChatStream(req, body);
   let headersSent = false;
+
+  // Open SSE before the model call so fetch() receives headers immediately.
+  // Waiting until the first delta/tool event delays TTFB until OpenAI returns,
+  // which looks like a hung composer on Vercel Preview.
+  if (stream) {
+    startSse(res);
+    headersSent = true;
+    writeSse(res, 'started', { ok: true });
+  }
 
   const dispatch = async (params) => {
     const result = await deps.dispatch({

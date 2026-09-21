@@ -11,6 +11,7 @@ export type ChatMessage = {
   role: 'user' | 'assistant' | 'tool';
   text: string;
   toolName?: string;
+  toolId?: string;
   toolStatus?: 'running' | 'ok' | 'error' | 'pending_confirm';
   confirmCard?: ConfirmCardModel | null;
 };
@@ -75,7 +76,8 @@ export function ChatThread({
                     <ToolStatusPill status={message.toolStatus} name={message.toolName} />
                   ) : null}
                 </div>
-                {message.text}
+                {message.text ||
+                  (message.role === 'assistant' && busy && !message.confirmCard ? 'Thinking…' : '')}
               </div>
               {message.confirmCard && !hideConfirmCard ? (
                 <ConfirmCard

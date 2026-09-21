@@ -20,6 +20,7 @@ import { HoldingsTable, type CashStrip, type HoldingRow } from '@/components/wor
 import { ReportDraftView, type ReportDraft } from '@/components/workspace/ReportDraftView';
 import { WorkspaceHeader } from '@/components/workspace/WorkspaceHeader';
 import { callTool, streamChatTurn, v1Fetch } from '@/lib/api';
+import { createBrowserSupabase } from '@/lib/supabase/browser';
 import { actionPath, assertSharedProposalId } from '@/src/web/dual-confirm.js';
 import { MOTION, SPLIT } from '@/src/web/tokens.js';
 import { parseComposerInput } from '@/src/web/parse-composer.js';
@@ -89,6 +90,7 @@ export function AppShell({
   const [impact, setImpact] = useState<Record<string, unknown> | null>(null);
   const [asOf, setAsOf] = useState<string | null>(null);
   const drag = useRef<{ startX: number; startPct: number } | null>(null);
+  const sendingRef = useRef(false);
 
   const firmId = apiSession?.firm_id ?? null;
 
@@ -240,6 +242,9 @@ export function AppShell({
   const pushMessage = (message: ChatMessage) => setMessages((list) => [...list, message]);
 
   const onSubmitComposer = async () => {
+    if (sendingRef.current || busy) {
+      return;
+    }
     const parsed = parseComposerInput(composer);
     if (parsed.type === 'empty') {
       return;
@@ -252,93 +257,138 @@ export function AppShell({
       return;
     }
     const history = messages
-      .filter((row) => row.role === 'user' || row.role === 'assistant')
-      .map((row) => ({ role: row.role, content: row.text }))
+      .filter((row) => (row.role === 'user' || row.role === 'assistant') && row.text.trim())
+      .map((row) => ({ role: row.role, content: row.text.trim() }))
       .concat({ role: 'user', content: text.trim() });
     const assistantId = newId();
     pushMessage({ id: assistantId, role: 'assistant', text: '' });
+    sendingRef.current = true;
     setBusy(true);
     let assembled = '';
-    const result = await streamChatTurn(token, firmId, history, {
-      onDelta: (chunk) => {
-        assembled += chunk;
-        setMessages((list) =>
-          list.map((row) => (row.id === assistantId ? { ...row, text: assembled } : row))
-        );
-      },
-      onTool: (event) => {
-        if (!event.name) {
-          return;
-        }
-        setMessages((list) => {
-          const existing = list.find((row) => row.toolName === event.name && row.role === 'tool' && row.toolStatus === 'running');
-          if (event.status === 'running' && !existing) {
-            return [
-              ...list,
-              {
-                id: newId(),
-                role: 'tool' as const,
-                text: `tool ${event.name}`,
-                toolName: event.name,
-                toolStatus: 'running',
-              },
-            ];
-          }
-          return list.map((row) =>
-            row.role === 'tool' && row.toolName === event.name && (row.toolStatus === 'running' || row.id === existing?.id)
-              ? {
-                  ...row,
-                  toolStatus: event.status ?? row.toolStatus,
-                  text: event.error?.message ?? row.text,
-                }
-              : row
+    let accessToken = token;
+    try {
+      const { data } = await createBrowserSupabase().auth.getSession();
+      if (data.session?.access_token) {
+        accessToken = data.session.access_token;
+      }
+    } catch {
+      // AuthGate session token is still sent as Bearer; API does not read cookies.
+    }
+    try {
+      const result = await streamChatTurn(accessToken, firmId, history, {
+        onDelta: (chunk) => {
+          assembled += chunk;
+          setMessages((list) =>
+            list.map((row) => (row.id === assistantId ? { ...row, text: assembled } : row))
           );
-        });
-      },
-    });
-    setBusy(false);
-    if (!result.ok) {
-      const message = result.error?.message ?? 'Chat turn failed.';
+        },
+        onTool: (event) => {
+          if (event.confirm_card || event.workspace_panel) {
+            attachProposal({
+              ...(event.confirm_card ? { confirm_card: event.confirm_card } : {}),
+              ...(event.workspace_panel ? { workspace_panel: event.workspace_panel } : {}),
+            } as Record<string, unknown>);
+          }
+          if (!event.name) {
+            return;
+          }
+          setMessages((list) => {
+            const existing = list.find((row) =>
+              row.role === 'tool' &&
+              (event.id ? row.toolId === event.id : row.toolName === event.name && row.toolStatus === 'running')
+            );
+            if (event.status === 'running' && !existing) {
+              return [
+                ...list,
+                {
+                  id: newId(),
+                  role: 'tool' as const,
+                  text: `tool ${event.name}`,
+                  toolName: event.name,
+                  toolId: event.id,
+                  toolStatus: 'running',
+                },
+              ];
+            }
+            return list.map((row) =>
+              row.role === 'tool' &&
+              (event.id ? row.toolId === event.id : row.toolName === event.name) &&
+              (row.toolStatus === 'running' || row.id === existing?.id)
+                ? {
+                    ...row,
+                    toolStatus: event.status ?? row.toolStatus,
+                    text: event.error?.message ?? row.text,
+                  }
+                : row
+            );
+          });
+        },
+        onDone: (data) => {
+          attachProposal({
+            ...(typeof data.confirm_card === 'object' && data.confirm_card
+              ? { confirm_card: data.confirm_card }
+              : {}),
+            ...(typeof data.workspace_panel === 'object' && data.workspace_panel
+              ? { workspace_panel: data.workspace_panel }
+              : {}),
+          } as Record<string, unknown>);
+        },
+      });
+      if (!result.ok) {
+        const message = result.error?.message ?? 'Chat turn failed.';
+        setMessages((list) =>
+          list.map((row) => (row.id === assistantId ? { ...row, text: assembled || message } : row))
+        );
+        toast(message);
+        return;
+      }
+      const data = {
+        ...(typeof result.confirm_card === 'object' && result.confirm_card
+          ? { confirm_card: result.confirm_card }
+          : {}),
+        ...(typeof result.workspace_panel === 'object' && result.workspace_panel
+          ? { workspace_panel: result.workspace_panel }
+          : {}),
+      } as Record<string, unknown>;
+      attachProposal(data);
+      const pending = Boolean(
+        result.confirm_card &&
+          typeof result.confirm_card === 'object' &&
+          ((result.confirm_card as ConfirmCardModel).status === 'pending' ||
+            (result.confirm_card as ConfirmCardModel).status === 'pending_confirm')
+      );
+      setMessages((list) =>
+        list.map((row) =>
+          row.id === assistantId
+            ? {
+                ...row,
+                text: result.text || assembled || row.text,
+                confirmCard: (result.confirm_card as ConfirmCardModel | undefined) ?? undefined,
+                toolStatus: pending ? 'pending_confirm' : undefined,
+              }
+            : row
+        )
+      );
+      const meeting = result.artifacts?.meeting as MeetingReport | undefined;
+      if (meeting) {
+        setMeetingMissing(false);
+        setMeeting(meeting);
+        setWorkspaceMode('meeting');
+      }
+      const report = result.artifacts?.report as ReportDraft | undefined;
+      if (report) {
+        setReport(report);
+        setWorkspaceMode('report');
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Chat turn failed.';
       setMessages((list) =>
         list.map((row) => (row.id === assistantId ? { ...row, text: assembled || message } : row))
       );
       toast(message);
-      return;
-    }
-    const data = {
-      ...(typeof result.confirm_card === 'object' && result.confirm_card ? { confirm_card: result.confirm_card } : {}),
-      ...(typeof result.workspace_panel === 'object' && result.workspace_panel
-        ? { workspace_panel: result.workspace_panel }
-        : {}),
-    } as Record<string, unknown>;
-    attachProposal(data);
-    const pending = Boolean(
-      result.confirm_card &&
-        typeof result.confirm_card === 'object' &&
-        (result.confirm_card as ConfirmCardModel).status === 'pending'
-    );
-    setMessages((list) =>
-      list.map((row) =>
-        row.id === assistantId
-          ? {
-              ...row,
-              text: result.text || assembled || row.text,
-              confirmCard: (result.confirm_card as ConfirmCardModel | undefined) ?? undefined,
-              toolStatus: pending ? 'pending_confirm' : undefined,
-            }
-          : row
-      )
-    );
-    const meeting = result.artifacts?.meeting as MeetingReport | undefined;
-    if (meeting) {
-      setMeetingMissing(false);
-      setMeeting(meeting);
-      setWorkspaceMode('meeting');
-    }
-    const report = result.artifacts?.report as ReportDraft | undefined;
-    if (report) {
-      setReport(report);
-      setWorkspaceMode('report');
+    } finally {
+      sendingRef.current = false;
+      setBusy(false);
     }
   };
 
@@ -593,7 +643,7 @@ export function AppShell({
           composer={composer}
           onComposerChange={setComposer}
           onSubmit={() => void onSubmitComposer()}
-          pendingConfirm={pendingCard?.status === 'pending'}
+          pendingConfirm={pendingCard?.status === 'pending' || pendingCard?.status === 'pending_confirm'}
           busy={busy}
           highlightedProposalId={highlightId}
           canConfirm={canConfirm}
@@ -653,7 +703,10 @@ export function AppShell({
             impact={impactPayload as never}
             busy={busy}
             canPromote={Boolean(scratchpad.id)}
-            pendingConfirm={Boolean(scratchpad.open && pendingPanel?.status === 'pending')}
+            pendingConfirm={Boolean(
+              scratchpad.open &&
+                (pendingPanel?.status === 'pending' || pendingPanel?.status === 'pending_confirm')
+            )}
             panel={scratchpad.open ? diffPanel : null}
             onDiscard={discardScratchpad}
             onPromote={() => void promoteScratchpad()}

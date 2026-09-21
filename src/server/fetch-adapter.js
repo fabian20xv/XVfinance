@@ -2,6 +2,9 @@
  * Fetch (Web Request/Response) adapter around createRequestListener.
  * Lets the Next.js App Router serve the same E0 /v1 HTTP API without forking routes.
  * Supports buffered JSON (writeHead + end) and SSE (writeHead + write + end).
+ *
+ * SSE: resolve the Response as soon as event-stream headers are written so
+ * Next.js/Vercel can start streaming before the OpenAI turn finishes.
  */
 import { Readable } from 'node:stream';
 import { createRequestListener } from './http.js';
@@ -25,6 +28,11 @@ function encodeChunk(chunk) {
     return chunk;
   }
   return Buffer.from(chunk);
+}
+
+function isEventStream(headers) {
+  const ct = String(headers['content-type'] || headers['Content-Type'] || '');
+  return ct.includes('text/event-stream');
 }
 
 /**
@@ -55,6 +63,7 @@ export function createFetchHandler(options) {
       let ended = false;
       let resolved = false;
       let streamController = null;
+      const pendingChunks = [];
 
       function ensureStream() {
         if (resolved) {
@@ -64,9 +73,22 @@ export function createFetchHandler(options) {
         const stream = new ReadableStream({
           start(controller) {
             streamController = controller;
+            for (const chunk of pendingChunks) {
+              controller.enqueue(chunk);
+            }
+            pendingChunks.length = 0;
           },
         });
         resolve(new Response(stream, { status, headers }));
+      }
+
+      function enqueue(chunk) {
+        const bytes = encodeChunk(chunk);
+        if (streamController) {
+          streamController.enqueue(bytes);
+          return;
+        }
+        pendingChunks.push(bytes);
       }
 
       const res = {
@@ -77,16 +99,27 @@ export function createFetchHandler(options) {
               headers[key] = value;
             }
           }
+          if (isEventStream(headers)) {
+            ensureStream();
+          }
         },
         setHeader(key, value) {
           headers[key] = value;
+          if (isEventStream(headers)) {
+            ensureStream();
+          }
+        },
+        flushHeaders() {
+          if (isEventStream(headers)) {
+            ensureStream();
+          }
         },
         write(chunk) {
           if (ended) {
             return false;
           }
           ensureStream();
-          streamController.enqueue(encodeChunk(chunk));
+          enqueue(chunk);
           return true;
         },
         end(payload) {
@@ -101,15 +134,36 @@ export function createFetchHandler(options) {
             return;
           }
           if (payload != null && payload !== '') {
-            streamController.enqueue(encodeChunk(payload));
+            enqueue(payload);
           }
-          streamController.close();
+          if (streamController) {
+            streamController.close();
+          }
         },
       };
 
       Promise.resolve(listener(req, res)).catch((err) => {
-        if (!ended && !resolved) {
+        if (ended) {
+          return;
+        }
+        if (!resolved) {
           reject(err);
+          return;
+        }
+        ended = true;
+        try {
+          const payload = `event: error\ndata: ${JSON.stringify({
+            ok: false,
+            error: { code: 'internal', message: err.message },
+          })}\n\n`;
+          enqueue(payload);
+          streamController?.close();
+        } catch {
+          try {
+            streamController?.error(err);
+          } catch {
+            // already closed
+          }
         }
       });
     });

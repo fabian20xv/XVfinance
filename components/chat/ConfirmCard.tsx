@@ -43,7 +43,7 @@ export function ConfirmCard({
   }
   const confirm = actionPath(fields.actions, 'confirm');
   const reject = actionPath(fields.actions, 'reject');
-  const pending = fields.status === 'pending';
+  const pending = fields.status === 'pending' || fields.status === 'pending_confirm';
   const confirmed = outcome?.status === 'confirmed' && outcome.proposalId === proposalId;
   const select = () => onSelect?.(proposalId);
   const badgeTone = confirmed ? 'success' : pending ? 'default' : 'default';
