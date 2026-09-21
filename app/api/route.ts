@@ -3,6 +3,7 @@ import { restoreXvPath } from '@/src/server/fetch-xv-path.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 async function handle(request: Request) {
   return getFetchHandler()(restoreXvPath(request));

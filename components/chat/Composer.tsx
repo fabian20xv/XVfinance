@@ -15,33 +15,40 @@ export function Composer({
   pendingConfirm?: boolean;
   busy?: boolean;
 }) {
+  const send = () => {
+    if (!busy && value.trim()) {
+      onSubmit();
+    }
+  };
+
   return (
     <form
       className="composer"
       onSubmit={(event) => {
         event.preventDefault();
-        onSubmit();
+        send();
       }}
     >
       <textarea
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        placeholder="Ask a portfolio question, or /get_session_context {json}"
+        placeholder="Ask about a portfolio, client, or meeting…"
         disabled={false}
         aria-disabled={false}
         data-unlocked-during-confirm={pendingConfirm ? 'true' : 'false'}
         onKeyDown={(event) => {
-          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-            event.preventDefault();
-            onSubmit();
+          if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) {
+            return;
           }
+          event.preventDefault();
+          send();
         }}
       />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
         <span style={{ fontSize: 11, color: 'var(--ink-muted)' }}>
           {pendingConfirm
-            ? 'Confirm pending — composer stays unlocked. Turns go to POST /v1/ai/chat only.'
-            : 'POST /v1/ai/chat · composer unlocked while confirm pending'}
+            ? 'A proposal is waiting — you can keep chatting.'
+            : 'Enter to send · Shift+Enter for a new line'}
         </span>
         <Button type="submit" variant="accent" disabled={busy || !value.trim()}>
           Send

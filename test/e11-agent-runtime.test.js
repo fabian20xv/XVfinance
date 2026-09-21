@@ -15,8 +15,10 @@ import { listToolNames } from '../src/chat/tool-router.js';
 import { ALLOWED_JWT_ISSUER, ALLOWED_SUPABASE_URL } from '../src/config/supabase-lock.js';
 import { SMOKE_FIRM_ID, SMOKE_MANAGER_ID } from '../src/db/smoke-ids.js';
 import { createFetchHandler } from '../src/server/fetch-adapter.js';
+import { restoreXvPath } from '../src/server/fetch-xv-path.js';
 import { startApiServer } from '../src/server/http.js';
 import { markServiceRoleClient } from '../src/security/service-role-guard.js';
+import { consumeChatSseStream } from '../src/web/chat-sse.js';
 
 const ROOT = join(import.meta.dirname, '..');
 const SECRET = 'xvfinance-test-jwt-secret-32chars!';
@@ -406,8 +408,10 @@ describe('E11 src/ai isolation', () => {
     assert.match(api, /fetch\('\/v1\/ai\/chat'/);
     assert.equal(api.includes("fetch('/v1/chat'"), false);
     const composer = readFileSync(join(ROOT, 'components/chat/Composer.tsx'), 'utf8');
-    assert.match(composer, /\/v1\/ai\/chat/);
+    assert.equal(composer.includes('/v1/ai/chat'), false);
     assert.equal(composer.includes('/v1/tools'), false);
+    assert.match(composer, /Ask about a portfolio, client, or meeting/);
+    assert.match(composer, /Enter to send/);
     const shell = readFileSync(join(ROOT, 'components/shell/AppShell.tsx'), 'utf8');
     assert.match(shell, /streamChatTurn/);
     assert.equal(shell.includes('POST /v1/tools'), false);
@@ -540,6 +544,7 @@ describe('E11 POST /v1/ai/chat HTTP', () => {
         assert.match(res.headers.get('content-type') || '', /text\/event-stream/);
         const text = await res.text();
         const events = parseSse(text);
+        assert.ok(events.some((event) => event.event === 'started'));
         assert.ok(events.some((event) => event.event === 'delta'));
         assert.equal(events.at(-1).event, 'done');
         assert.match(events.at(-1).data.text, /PM agent/);
@@ -574,5 +579,179 @@ describe('E11 POST /v1/ai/chat HTTP', () => {
     const streamed = parseSse(await response.text());
     assert.equal(streamed.at(-1).event, 'done');
     assert.match(streamed.at(-1).data.text, /Adapter stream/);
+    assert.ok(streamed.some((event) => event.event === 'started'));
+  });
+
+  it('vercel.json xv_path rewrite still streams POST /v1/ai/chat', async () => {
+    const token = await mint();
+    const handler = createFetchHandler({
+      env: {
+        SUPABASE_URL: LOCKED_URL,
+        SUPABASE_ANON_KEY: 'anon-key',
+        SUPABASE_JWT_SECRET: SECRET,
+      },
+      deps: {
+        ...sessionDeps,
+        chatProvider: scriptedProvider([
+          { content: 'Rewritten stream.', toolCalls: [], usage: { completion_tokens: 2 } },
+        ]),
+      },
+    });
+    const rewritten = restoreXvPath(
+      new Request('http://127.0.0.1/api?xv_path=/v1/ai/chat', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${token}`,
+          'content-type': 'application/json',
+          accept: 'text/event-stream',
+        },
+        body: JSON.stringify({ stream: true, messages: [{ role: 'user', content: 'Hi' }] }),
+      })
+    );
+    assert.equal(new URL(rewritten.url).pathname, '/v1/ai/chat');
+    const response = await handler(rewritten);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('content-type') || '', /text\/event-stream/);
+    const events = parseSse(await response.text());
+    assert.ok(events.some((event) => event.event === 'started'));
+    assert.equal(events.at(-1).event, 'done');
+    assert.match(events.at(-1).data.text, /Rewritten stream/);
+  });
+
+  it('returns SSE headers before the model completes so the composer is not stuck on TTFB', async () => {
+    const token = await mint();
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    const handler = createFetchHandler({
+      env: {
+        SUPABASE_URL: LOCKED_URL,
+        SUPABASE_ANON_KEY: 'anon-key',
+        SUPABASE_JWT_SECRET: SECRET,
+      },
+      deps: {
+        ...sessionDeps,
+        chatProvider: {
+          name: 'mock',
+          model: 'mock-pm',
+          async completeChat() {
+            await gate;
+            return { content: 'Later.', toolCalls: [], usage: { completion_tokens: 1 } };
+          },
+        },
+      },
+    });
+    const started = Date.now();
+    const response = await Promise.race([
+      handler(
+        new Request('http://127.0.0.1/v1/ai/chat', {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${token}`,
+            'content-type': 'application/json',
+            accept: 'text/event-stream',
+          },
+          body: JSON.stringify({ stream: true, messages: [{ role: 'user', content: 'Hi' }] }),
+        })
+      ),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('SSE TTFB waited on the model')), 250)
+      ),
+    ]);
+    assert.ok(Date.now() - started < 250);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('content-type') || '', /text\/event-stream/);
+    const reader = response.body.getReader();
+    const first = await reader.read();
+    assert.match(new TextDecoder().decode(first.value), /event: started/);
+    release();
+    while (!(await reader.read()).done) {
+      // drain remaining SSE so the listener can finish
+    }
+  });
+
+  it('pending_confirm tool events carry confirm_card for the left-pane card', async () => {
+    const events = [];
+    const card = { ui: 'chat.confirm_card', proposal_id: SMOKE_FIRM_ID, status: 'pending' };
+    const panel = { ui: 'workspace.diff_confirm_panel', proposal_id: SMOKE_FIRM_ID, status: 'pending' };
+    await runChatTurn({
+      messages: [{ role: 'user', content: 'Set SPY to 500 shares.' }],
+      session,
+      userJwt: 'user-jwt',
+      env: { SUPABASE_URL: LOCKED_URL, SUPABASE_ANON_KEY: 'anon' },
+      emit: (event) => events.push(event),
+      provider: scriptedProvider([
+        {
+          content: '',
+          toolCalls: [{ id: 'c1', name: 'propose_holding_changes', arguments: '{}' }],
+          usage: { completion_tokens: 2 },
+        },
+        { content: 'Confirm the proposal to apply.', toolCalls: [], usage: { completion_tokens: 4 } },
+      ]),
+      dispatch: async () => ({
+        ok: true,
+        data: { confirm_card: card, workspace_panel: panel, status: 'pending' },
+      }),
+    });
+    const pending = events.find(
+      (event) => event.event === 'tool' && event.data.status === 'pending_confirm'
+    );
+    assert.ok(pending);
+    assert.equal(pending.data.confirm_card.proposal_id, SMOKE_FIRM_ID);
+    assert.equal(pending.data.workspace_panel.proposal_id, SMOKE_FIRM_ID);
+  });
+});
+
+describe('E11 composer SSE client', () => {
+  it('consumeChatSseStream applies delta/tool/done and fails if done is missing', async () => {
+    const chunks = [
+      'event: started\ndata: {"ok":true}\n\n',
+      'event: delta\ndata: {"text":"Hello "}\n\n',
+      'event: delta\ndata: {"text":"world"}\n\n',
+      'event: done\ndata: {"ok":true,"text":"Hello world","confirm_card":{"proposal_id":"p1","status":"pending"}}\n\n',
+    ];
+    const stream = new ReadableStream({
+      start(controller) {
+        for (const chunk of chunks) {
+          controller.enqueue(new TextEncoder().encode(chunk));
+        }
+        controller.close();
+      },
+    });
+    const deltas = [];
+    const result = await consumeChatSseStream(stream, { onDelta: (text) => deltas.push(text) });
+    assert.equal(result.ok, true);
+    assert.equal(deltas.join(''), 'Hello world');
+    assert.equal(result.confirm_card.proposal_id, 'p1');
+
+    const truncated = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('event: delta\ndata: {"text":"partial"}\n\n'));
+        controller.close();
+      },
+    });
+    const incomplete = await consumeChatSseStream(truncated);
+    assert.equal(incomplete.ok, false);
+    assert.equal(incomplete.error.code, 'openai_error');
+    assert.match(incomplete.error.message, /done event/);
+    assert.equal(incomplete.text, 'partial');
+  });
+
+  it('composer still posts only to /v1/ai/chat with the session Bearer and same-origin cookies', () => {
+    const api = readFileSync(join(ROOT, 'lib/api.ts'), 'utf8');
+    assert.match(api, /fetch\('\/v1\/ai\/chat'/);
+    assert.match(api, /credentials: 'include'/);
+    assert.match(api, /consumeChatSseStream/);
+    assert.equal(api.includes("fetch('/v1/chat'"), false);
+    const shell = readFileSync(join(ROOT, 'components/shell/AppShell.tsx'), 'utf8');
+    assert.match(shell, /streamChatTurn/);
+    assert.match(shell, /createBrowserSupabase\(\)\.auth\.getSession/);
+    assert.match(shell, /sendingRef/);
+    assert.equal(existsSync(join(ROOT, 'middleware.ts')), false);
+    const chatHttp = readFileSync(join(ROOT, 'src/server/chat-http.js'), 'utf8');
+    assert.match(chatHttp, /event: started|writeSse\(res, 'started'/);
+    const v1Route = readFileSync(join(ROOT, 'app/v1/[...path]/route.ts'), 'utf8');
+    assert.match(v1Route, /maxDuration = 60/);
   });
 });

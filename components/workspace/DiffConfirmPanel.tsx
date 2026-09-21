@@ -75,7 +75,7 @@ export function DiffConfirmPanel({
   const safe = withNullPublicUrl(panel) as DiffPanelModel;
   const confirm = actionPath(safe.actions, 'confirm');
   const reject = actionPath(safe.actions, 'reject');
-  const pending = safe.status === 'pending';
+  const pending = safe.status === 'pending' || safe.status === 'pending_confirm';
   const meetingSend = safe.kind === 'meeting_send';
   const confirmed = outcome?.status === 'confirmed' && outcome.proposalId === safe.proposal_id;
   const select = () => onSelect?.(safe.proposal_id);

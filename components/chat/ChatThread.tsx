@@ -1,19 +1,29 @@
 'use client';
 
+import { useLayoutEffect, useRef } from 'react';
 import { ConfirmCard, type ConfirmCardModel } from '@/components/chat/ConfirmCard';
 import type { ConfirmOutcome } from '@/components/chat/ConfirmActions';
 import { Composer } from '@/components/chat/Composer';
 import { ToolStatusPill } from '@/components/chat/ToolStatusPill';
 import { DashedEmptySlot } from '@/components/workspace/DashedEmptySlot';
 
+export type ChatToolEvent = {
+  id?: string;
+  name?: string;
+  status: 'running' | 'ok' | 'error' | 'pending_confirm';
+};
+
 export type ChatMessage = {
   id: string;
-  role: 'user' | 'assistant' | 'tool';
+  role: 'user' | 'assistant';
   text: string;
-  toolName?: string;
-  toolStatus?: 'running' | 'ok' | 'error' | 'pending_confirm';
+  tools?: ChatToolEvent[];
   confirmCard?: ConfirmCardModel | null;
 };
+
+function bubbleLabel(role: ChatMessage['role']) {
+  return role === 'user' ? 'You' : 'XV';
+}
 
 export function ChatThread({
   messages,
@@ -46,53 +56,83 @@ export function ChatThread({
   onConfirm: (proposalId: string, path: string, method: string) => void;
   onReject: (proposalId: string, path: string, method: string) => void;
 }) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) {
+      return;
+    }
+    el.scrollTop = el.scrollHeight;
+  }, [messages, busy]);
+
   return (
     <section className="pane pane-chat" aria-label="Chat">
-      <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'grid', gap: 12, alignContent: 'start' }}>
+      <div
+        ref={scrollerRef}
+        style={{ flex: 1, overflow: 'auto', padding: 16, display: 'grid', gap: 12, alignContent: 'start' }}
+      >
         {messages.length === 0 ? (
           <DashedEmptySlot
             label="No thread yet"
-            hint="Ask in natural language. The agent uses allowlisted tools. Writes stay propose → confirm."
+            hint="Ask about a portfolio, client, or meeting. Proposed changes wait for your confirm."
           />
         ) : (
-          messages.map((message) => (
-            <div key={message.id} style={{ display: 'grid', gap: 8 }}>
-              <div
-                style={{
-                  justifySelf: message.role === 'user' ? 'end' : 'start',
-                  maxWidth: '92%',
-                  background: message.role === 'user' ? 'var(--accent-soft)' : 'var(--paper)',
-                  border: '1px solid var(--line)',
-                  borderRadius: 10,
-                  padding: 10,
-                  fontSize: 13,
-                  whiteSpace: 'pre-wrap',
-                }}
-              >
-                <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-                  <strong style={{ fontSize: 11, color: 'var(--ink-muted)' }}>{message.role}</strong>
-                  {message.toolStatus ? (
-                    <ToolStatusPill status={message.toolStatus} name={message.toolName} />
+          messages.map((message) => {
+            const showCaret =
+              message.role === 'assistant' && Boolean(busy) && !message.text.trim();
+            return (
+              <div key={message.id} style={{ display: 'grid', gap: 8 }}>
+                <div
+                  style={{
+                    justifySelf: message.role === 'user' ? 'end' : 'start',
+                    maxWidth: '92%',
+                    background: message.role === 'user' ? 'var(--accent-soft)' : 'var(--paper)',
+                    border: '1px solid var(--line)',
+                    borderRadius: 10,
+                    padding: 10,
+                    fontSize: 13,
+                    whiteSpace: 'pre-wrap',
+                  }}
+                >
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+                    <strong style={{ fontSize: 11, color: 'var(--ink-muted)' }}>{bubbleLabel(message.role)}</strong>
+                  </div>
+                  {message.text}
+                  {showCaret ? <span className="stream-caret" aria-hidden="true" /> : null}
+                  {message.role === 'assistant' && message.tools?.length ? (
+                    <div
+                      style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: message.text || showCaret ? 8 : 0 }}
+                    >
+                      {message.tools.map((tool) => (
+                        <ToolStatusPill
+                          key={tool.id ?? tool.name ?? tool.status}
+                          status={tool.status}
+                          name={tool.name}
+                        />
+                      ))}
+                    </div>
                   ) : null}
                 </div>
-                {message.text}
+                {message.confirmCard && !hideConfirmCard ? (
+                  <ConfirmCard
+                    card={message.confirmCard}
+                    highlighted={highlightedProposalId === message.confirmCard.proposal_id}
+                    canConfirm={canConfirm}
+                    busy={busy}
+                    outcome={outcome}
+                    onSelect={onSelectProposal}
+                    onConfirm={onConfirm}
+                    onReject={onReject}
+                  />
+                ) : null}
               </div>
-              {message.confirmCard && !hideConfirmCard ? (
-                <ConfirmCard
-                  card={message.confirmCard}
-                  highlighted={highlightedProposalId === message.confirmCard.proposal_id}
-                  canConfirm={canConfirm}
-                  busy={busy}
-                  outcome={outcome}
-                  onSelect={onSelectProposal}
-                  onConfirm={onConfirm}
-                  onReject={onReject}
-                />
-              ) : null}
-            </div>
-          ))
+            );
+          })
         )}
-        {pendingCard && !hideConfirmCard && !messages.some((row) => row.confirmCard?.proposal_id === pendingCard.proposal_id) ? (
+        {pendingCard &&
+        !hideConfirmCard &&
+        !messages.some((row) => row.confirmCard?.proposal_id === pendingCard.proposal_id) ? (
           <ConfirmCard
             card={pendingCard}
             highlighted={highlightedProposalId === pendingCard.proposal_id}
