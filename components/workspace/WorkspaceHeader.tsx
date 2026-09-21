@@ -8,15 +8,18 @@ export function WorkspaceHeader({
   scratchpadOpen,
   onEnterScratchpad,
   onShowMeeting,
+  onLeaveMeeting,
 }: {
   title: string;
   asOf?: string | null;
   scratchpadOpen?: boolean;
   onEnterScratchpad?: () => void;
   onShowMeeting?: () => void;
+  onLeaveMeeting?: () => void;
 }) {
   return (
     <header
+      className="workspace-header"
       style={{
         display: 'flex',
         alignItems: 'flex-start',
@@ -34,6 +37,11 @@ export function WorkspaceHeader({
         {scratchpadOpen ? <p className="ws-subline">{SCRATCHPAD_WATERMARK_SUBLINE}</p> : null}
       </div>
       <span style={{ flex: 1 }} />
+      {onLeaveMeeting ? (
+        <Button variant="ghost" data-ui="workspace.leave_meeting" aria-label="Leave meeting" onClick={onLeaveMeeting}>
+          Leave
+        </Button>
+      ) : null}
       {onShowMeeting ? (
         <Button variant="ghost" onClick={onShowMeeting}>
           Meeting

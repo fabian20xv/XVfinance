@@ -1,7 +1,10 @@
 'use client';
 
+import { SPEAK_RECEIPTS_KEY } from '@/src/web/speak-ready.js';
+
 /**
- * Deferred to epic 1.5 — kept in inventory, not mounted in AppShell (Dana v1.2).
+ * Speak 1.5 meeting mode. Mounted by AppShell only while the meeting workspace is open.
+ * Client-only — does not call a speak API.
  */
 export function SpeakReadyToggle({
   ready,
@@ -13,16 +16,24 @@ export function SpeakReadyToggle({
   return (
     <button
       type="button"
-      className="btn btn-ghost"
+      className="btn btn-ghost speak-ready-toggle"
+      data-ui="shell.speak_ready_toggle"
       aria-pressed={ready}
+      aria-keyshortcuts={SPEAK_RECEIPTS_KEY}
       onClick={() => onChange(!ready)}
-      title="Deferred to epic 1.5. No E0–E9 speak API."
+      title={
+        ready
+          ? 'Speak ready. Meeting body is 18/28. Press R for receipts.'
+          : 'Speak off. Turn on to enlarge the meeting 1-pager.'
+      }
       style={{
         borderColor: ready ? 'var(--amber-pulse)' : 'var(--line)',
         color: ready ? 'var(--amber-pulse)' : 'var(--ink-muted)',
       }}
     >
+      <span className={`speak-ready-dot${ready ? ' is-on' : ''}`} aria-hidden="true" />
       {ready ? 'Speak ready' : 'Speak off'}
+      {ready ? <kbd className="speak-ready-key">{SPEAK_RECEIPTS_KEY.toUpperCase()}</kbd> : null}
     </button>
   );
 }
