@@ -68,7 +68,7 @@ SUPABASE_JWT_SECRET=<develop>
 
 This seed **reuses** the E1–E9 files in `supabase/migrations/` (`firms`, `firm_members`, clients, portfolios, holdings, notes, watchlists, proposals, reports, `audit_events`, …). It does not add product tables.
 
-`20260920210000_proposal_lifecycle_audit.sql` is **not parent-only**: apply it on develop `bkwhqfkosxnoffpsjcug` (Preview/Tess) and on parent `krcwpupbdizzjyydzaqp` (prod). Refuse any other Supabase ref. Tess A→G needs this fail-closed trigger on develop.
+`20260920210000_proposal_lifecycle_audit.sql` and `20260921100000_meeting_send_apply.sql` are **not parent-only**: apply them on develop `bkwhqfkosxnoffpsjcug` (Preview/Tess). Refuse any other Supabase ref. Do **not** apply Tess fixture seeds to parent. Tess A→G needs fail-closed confirm audit and `meeting_send` apply on develop.
 
 If develop is behind main, **schema migrations must be applied to develop** before `seed:tess`. The seed fails with `Develop schema is behind main` when `firms` / `reports` / `audit_events` are missing.
 
@@ -118,6 +118,8 @@ Expected local files (apply any that are Local-only on develop):
 - `20260918220000_e3_e4_watchlists_proposals.sql`
 - `20260918230000_e5_e8_reports_imports_scratchpad.sql`
 - `20260918240000_e9_meeting_ghostwriter.sql`
+- `20260920210000_proposal_lifecycle_audit.sql`
+- `20260921100000_meeting_send_apply.sql`
 
 ### B) Run `npm run seed:tess` (develop URL + develop service-role)
 

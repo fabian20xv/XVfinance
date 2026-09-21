@@ -214,4 +214,40 @@ describe('CA-9 meeting ghostwriter + receipts', () => {
     assert.equal(result.audit.action, 'meeting.exported');
     assert.equal(result.data.receipts_panel.client_facing, true);
   });
+
+  it('applies meeting_send on manager confirm and then allows export', async () => {
+    const client = db();
+    const proposed = await run(
+      'propose_meeting_send',
+      { report_id: SMOKE_MEETING_REPORT_ID, channel: 'export' },
+      { session: manager, client }
+    );
+    assert.equal(proposed.result.ok, true);
+    assert.equal(proposed.result.data.status, 'pending');
+    const proposalId = proposed.result.data.id;
+
+    const confirmed = await run(
+      'confirm_proposal',
+      { proposal_id: proposalId },
+      { session: manager, client }
+    );
+    assert.equal(confirmed.result.ok, true);
+    assert.notEqual(confirmed.result.data.db_status, 'failed');
+    assert.ok(['applied', 'confirmed'].includes(confirmed.result.data.db_status));
+    assert.equal(confirmed.result.data.status, 'confirmed');
+    assert.equal(confirmed.result.data.error, null);
+    assert.equal(client.db.reports[0].status, 'published');
+    assert.ok(client.db.reports[0].sent_at);
+    assert.equal(client.db.reports[0].send_channel, 'export');
+
+    const exported = await run(
+      'export_meeting_one_pager',
+      { report_id: SMOKE_MEETING_REPORT_ID },
+      { session: manager, client }
+    );
+    assert.equal(exported.result.ok, true);
+    assert.equal(exported.result.data.public_url, null);
+    assert.equal(exported.result.data.export.audited, true);
+    assert.equal(exported.result.data.export.channel, 'export');
+  });
 });

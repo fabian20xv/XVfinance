@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { applyConfirmedProposal } from '../../src/proposals/apply-meeting-send.js';
 
 function matches(row, filters) {
   return filters.every((fn) => fn(row));
@@ -144,7 +145,14 @@ class Query {
         if (!matches(row, this.filters)) {
           return row;
         }
-        const next = { ...row, ...this.payload };
+        let next = { ...row, ...this.payload };
+        if (
+          this.table === 'proposals' &&
+          row.status === 'pending_confirm' &&
+          this.payload?.status === 'confirmed'
+        ) {
+          next = applyConfirmedProposal(this.db, row, next);
+        }
         updated.push(next);
         return next;
       });

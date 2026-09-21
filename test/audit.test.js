@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { SMOKE_FIRM_ID, SMOKE_MANAGER_ID } from '../src/db/smoke-ids.js';
+import { asAuditEntityId, AUDIT_NIL_UUID, coerceAuditEntityId } from '../src/audit/entity-id.js';
 import { proposalAuditAction, redactAuditPayload, writeAuditEvent } from '../src/server/audit.js';
 
 describe('CA-2.3 audit writer', () => {
@@ -61,5 +62,45 @@ describe('CA-2.3 audit writer', () => {
     const redacted = redactAuditPayload({ outer: { service_role: 'x', ok: 1 } });
     assert.equal(redacted.outer.service_role, '[redacted]');
     assert.equal(redacted.outer.ok, 1);
+  });
+
+  it('never writes a non-UUID entity_id (ticker strings become the nil UUID)', async () => {
+    assert.equal(asAuditEntityId('SPY'), null);
+    assert.equal(coerceAuditEntityId('SPY'), AUDIT_NIL_UUID);
+    assert.equal(asAuditEntityId(SMOKE_MANAGER_ID), SMOKE_MANAGER_ID);
+    assert.equal(asAuditEntityId(null), null);
+
+    const inserted = [];
+    await writeAuditEvent({
+      firmId: SMOKE_FIRM_ID,
+      actorId: SMOKE_MANAGER_ID,
+      action: 'market.quote',
+      entityTable: 'instruments',
+      entityId: 'SPY',
+      payload: { symbol: 'SPY' },
+      createAdmin: () => ({
+        from(table) {
+          assert.equal(table, 'audit_events');
+          return {
+            insert(row) {
+              inserted.push(row);
+              return {
+                select() {
+                  return {
+                    async single() {
+                      return { data: { id: 'audit-row-spy' }, error: null };
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      }),
+    });
+
+    assert.equal(inserted.length, 1);
+    assert.equal(inserted[0].entity_id, AUDIT_NIL_UUID);
+    assert.notEqual(inserted[0].entity_id, 'SPY');
   });
 });
