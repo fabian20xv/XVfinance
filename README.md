@@ -79,7 +79,7 @@ Same listener (`createRequestListener` in `src/server/http.js`). Different proce
 | --- | --- | --- |
 | How it starts | `npm start` → `node src/index.js --serve` | Next.js App Router (`app/`) plus the same listener via `app/api/*`, `app/v1/*`, and `api/index.js` |
 | Process | Long-lived `node:http` server, `PORT` default `8787` | One serverless invocation per request (Fluid Compute). No `node src/index.js --serve` |
-| Routing | `req.url` is the public path | `vercel.json` sends `/api/health`, `/api/smoke`, `/health`, and `/v1/*` to the same listener (`xv_path` for `/health` and `/v1/*`). `/` is the E10 Dana shell — there is no catch-all rewrite |
+| Routing | `req.url` is the public path | `vercel.json` sets `framework: nextjs` + `buildCommand: next build` (required: a root `api/` folder without a `build` script made Vercel treat this as functions-only, so `/` was platform `NOT_FOUND`). Rewrites send `/api/health`, `/api/smoke`, `/health`, and `/v1/*` to the same listener (`xv_path` for `/health` and `/v1/*`). `/` is the E10 Dana shell. No catch-all rewrite. No root `middleware.ts`. |
 | Allowlist | `boot()` on process start | `boot()` on Function init (same `SUPABASE_URL` allowlist; develop ref refused when `VERCEL_ENV`/`APP_ENV` is production) |
 
 Do not run `--serve` on Vercel. Preview/staging `SUPABASE_URL` must be develop only (`bkwhqfkosxnoffpsjcug`). Never parent `krcwpupbdizzjyydzaqp` on Preview.

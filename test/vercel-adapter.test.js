@@ -39,6 +39,8 @@ async function withAdapter(t, { env = {}, deps = {} } = {}, fn) {
 describe('Vercel adapter', () => {
   it('vercel.json sends health, smoke, /health, and /v1/* to the Function', () => {
     const config = JSON.parse(readFileSync(join(root, 'vercel.json'), 'utf8'));
+    assert.equal(config.framework, 'nextjs');
+    assert.equal(config.buildCommand, 'next build');
     const sources = config.rewrites.map((rule) => rule.source);
     const destinations = config.rewrites.map((rule) => rule.destination);
     for (const source of ['/api/health', '/api/smoke', '/health', '/v1/:path*']) {

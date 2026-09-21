@@ -40,3 +40,5 @@ jobs:
             echo 'Next.js still emitted an Edge middleware bundle; remove middleware.ts so / is not gated'
             exit 1
           fi
+      - name: Next.js build includes App Router /
+        run: test -e .next/server/app/page.js
