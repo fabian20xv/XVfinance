@@ -8,6 +8,7 @@ import {
   dbStatusesForApi,
   requiresRoleForKind,
   roleCanConfirm,
+  roleCanReject,
 } from '../proposals/defaults.js';
 import { buildPreview } from '../proposals/preview.js';
 import { hasUnmatchedSymbols, unmatchedMessage, unmatchedSymbols } from '../proposals/unmatched.js';
@@ -94,6 +95,12 @@ function assertPending(proposal) {
 }
 
 function assertRole(session, proposal, verb) {
+  if (verb === 'reject') {
+    if (!roleCanReject(session.role)) {
+      throw forbidden('Firm membership required to reject this proposal', 'forbidden');
+    }
+    return;
+  }
   const requires = proposal.requires_role === 'any_member' ? 'any_member' : 'manager';
   if (!roleCanConfirm(session.role, requires)) {
     throw forbidden(`Manager role required to ${verb} this proposal`, 'forbidden');
@@ -300,7 +307,7 @@ export const PROPOSAL_TOOLS = {
     },
   },
   reject_proposal: {
-    description: 'Reject a pending proposal (same role gate as confirm).',
+    description: 'Reject a pending proposal. Any firm member may dismiss; confirm/apply stay role-gated.',
     schema: {
       type: 'object',
       additionalProperties: false,

@@ -88,3 +88,82 @@ export function withNullPublicUrl(panel) {
   }
   return next;
 }
+
+/**
+ * Patch chat.confirm_card / workspace.diff_confirm_panel onto a terminal status
+ * without changing proposal_id (twins stay aligned).
+ * @param {{ proposal_id?: string } | null | undefined} model
+ * @param {string} proposalId
+ * @param {{ status: string, db_status?: string | null }} patch
+ */
+export function applyTwinTerminalState(model, proposalId, patch) {
+  if (!model || model.proposal_id !== proposalId) {
+    return model;
+  }
+  const next = { ...model, status: patch.status };
+  if (patch.db_status != null) {
+    next.db_status = patch.db_status;
+  }
+  return next;
+}
+
+/**
+ * @param {Array<{ confirmCard?: { proposal_id?: string } | null }>} messages
+ * @param {string} proposalId
+ * @param {{ status: string, db_status?: string | null }} patch
+ */
+export function applyMessageConfirmCardTerminal(messages, proposalId, patch) {
+  return (messages ?? []).map((row) => {
+    if (row?.confirmCard?.proposal_id !== proposalId) {
+      return row;
+    }
+    return { ...row, confirmCard: applyTwinTerminalState(row.confirmCard, proposalId, patch) };
+  });
+}
+
+/**
+ * @param {Record<string, { proposalId?: string, status?: string, at?: Date }> | null | undefined} outcomes
+ * @param {string | null | undefined} proposalId
+ */
+export function twinOutcome(outcomes, proposalId) {
+  if (!proposalId || !outcomes) {
+    return null;
+  }
+  const hit = outcomes[proposalId];
+  return hit?.proposalId === proposalId ? hit : null;
+}
+
+/**
+ * Terminal confirm/dismiss for a twin. Prefers the local API outcome; falls
+ * back to the card/panel status so buttons do not return after a fade.
+ * @param {{ proposalId?: string, status?: string, at?: Date } | null | undefined} outcome
+ * @param {string} proposalId
+ * @param {string | null | undefined} status
+ */
+export function resolveTwinOutcome(outcome, proposalId, status) {
+  if (
+    outcome?.proposalId === proposalId &&
+    (outcome.status === 'confirmed' || outcome.status === 'rejected')
+  ) {
+    return outcome;
+  }
+  if (status === 'rejected') {
+    return { status: 'rejected', at: outcome?.at, proposalId };
+  }
+  if (status === 'confirmed' || status === 'applied') {
+    return { status: 'confirmed', at: outcome?.at, proposalId };
+  }
+  return null;
+}
+
+/**
+ * Persist per-proposal terminal confirm/dismiss so chat ConfirmCard does not
+ * snap back to Confirm/Dismiss after the workspace panel unmounts.
+ * @param {Record<string, object>} prev
+ * @param {string} proposalId
+ * @param {'confirmed' | 'rejected'} status
+ * @param {Date} [at]
+ */
+export function rememberConfirmOutcome(prev, proposalId, status, at = new Date()) {
+  return { ...prev, [proposalId]: { status, at, proposalId } };
+}

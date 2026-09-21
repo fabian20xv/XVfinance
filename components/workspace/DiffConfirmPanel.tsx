@@ -2,7 +2,7 @@
 
 import { Badge } from '@/components/primitives/Badge';
 import { ConfirmActions, type ConfirmOutcome } from '@/components/chat/ConfirmActions';
-import { actionPath, withNullPublicUrl } from '@/src/web/dual-confirm.js';
+import { actionPath, resolveTwinOutcome, withNullPublicUrl } from '@/src/web/dual-confirm.js';
 import { ReceiptFootnote } from '@/components/meeting/ReceiptFootnote';
 
 export type DiffPanelModel = {
@@ -57,8 +57,10 @@ export function DiffConfirmPanel({
   panel,
   highlighted,
   canConfirm,
+  canReject = true,
   busy,
   outcome,
+  actionError,
   onSelect,
   onConfirm,
   onReject,
@@ -66,8 +68,10 @@ export function DiffConfirmPanel({
   panel: DiffPanelModel;
   highlighted?: boolean;
   canConfirm: boolean;
+  canReject?: boolean;
   busy?: boolean;
-  outcome?: ConfirmOutcome;
+  outcome?: ConfirmOutcome | null;
+  actionError?: { proposalId: string; message: string } | null;
   onSelect?: (proposalId: string) => void;
   onConfirm: (proposalId: string, path: string, method: string) => void;
   onReject: (proposalId: string, path: string, method: string) => void;
@@ -77,8 +81,11 @@ export function DiffConfirmPanel({
   const reject = actionPath(safe.actions, 'reject');
   const pending = safe.status === 'pending' || safe.status === 'pending_confirm';
   const meetingSend = safe.kind === 'meeting_send';
-  const confirmed = outcome?.status === 'confirmed' && outcome.proposalId === safe.proposal_id;
+  const resolved = resolveTwinOutcome(outcome, safe.proposal_id, safe.status);
+  const terminal = resolved?.status === 'confirmed' || resolved?.status === 'rejected';
+  const confirmed = resolved?.status === 'confirmed';
   const select = () => onSelect?.(safe.proposal_id);
+  const error = actionError?.proposalId === safe.proposal_id ? actionError.message : null;
 
   return (
     <section
@@ -113,12 +120,15 @@ export function DiffConfirmPanel({
         />
       ) : null}
       <ConfirmActions
-        pending={pending}
+        pending={pending && !terminal}
         canConfirm={canConfirm}
+        canReject={canReject}
         busy={busy}
         confirm={confirm}
         reject={reject}
-        outcome={confirmed ? outcome : null}
+        outcome={terminal ? resolved : null}
+        error={error}
+        persistTerminal={false}
         onSelect={select}
         onConfirm={(path, method) => onConfirm(safe.proposal_id, path, method)}
         onReject={(path, method) => onReject(safe.proposal_id, path, method)}

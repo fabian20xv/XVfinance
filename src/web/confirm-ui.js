@@ -10,15 +10,34 @@ export const CONFIRM_COPY = Object.freeze({
   secondary: 'Dismiss proposal',
 });
 
+function actionClock(at = new Date()) {
+  const date = at instanceof Date ? at : new Date(at);
+  if (Number.isNaN(date.getTime())) {
+    return '—';
+  }
+  return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
 /**
  * @param {Date | string | number} [at]
  */
 export function confirmedLine(at = new Date()) {
-  const date = at instanceof Date ? at : new Date(at);
-  const time = Number.isNaN(date.getTime())
-    ? '—'
-    : date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  return `Confirmed · ${time} · you`;
+  return `Confirmed · ${actionClock(at)} · you`;
+}
+
+/**
+ * @param {Date | string | number} [at]
+ */
+export function dismissedLine(at = new Date()) {
+  return `Dismissed · ${actionClock(at)} · you`;
+}
+
+/**
+ * @param {'confirmed' | 'rejected' | string} status
+ * @param {Date | string | number} [at]
+ */
+export function terminalActionLine(status, at = new Date()) {
+  return status === 'rejected' ? dismissedLine(at) : confirmedLine(at);
 }
 
 export const CONFIRM_SUCCESS_FADE_MS = MOTION.successFadeMs;

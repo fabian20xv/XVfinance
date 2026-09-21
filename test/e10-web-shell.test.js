@@ -8,12 +8,12 @@ import { receiptsPanel } from '../src/meetings/receipts.js';
 import { getPublicSupabaseConfig } from '../src/client/public-config.js';
 import { restoreXvPath } from '../src/server/fetch-xv-path.js';
 import { createFetchHandler } from '../src/server/fetch-adapter.js';
-import { assertSharedProposalId, confirmCardFields, withNullPublicUrl } from '../src/web/dual-confirm.js';
+import { assertSharedProposalId, applyMessageConfirmCardTerminal, applyTwinTerminalState, confirmCardFields, rememberConfirmOutcome, resolveTwinOutcome, twinOutcome, withNullPublicUrl } from '../src/web/dual-confirm.js';
 import { parseComposerInput } from '../src/web/parse-composer.js';
 import { discardedScratchpadState, scratchpadOverlay, SCRATCHPAD_EXIT_MS, SCRATCHPAD_FAIL_TOAST, SCRATCHPAD_WATERMARK_DISPLAY, SCRATCHPAD_WATERMARK_SUBLINE, formatAsOfChip } from '../src/web/scratchpad-ui.js';
 import { clampChatPct, resetChatPct, workspacePct } from '../src/web/split.js';
 import { CHROME, DANA_VERSION, MOTION, SPLIT, TOKENS } from '../src/web/tokens.js';
-import { confirmedLine, CONFIRM_COPY, isUnreadEdgeClipped } from '../src/web/confirm-ui.js';
+import { confirmedLine, dismissedLine, terminalActionLine, CONFIRM_COPY, isUnreadEdgeClipped } from '../src/web/confirm-ui.js';
 import { focusEntityLabel, receiptBodyLine, receiptMark, receiptTitle, RECEIPT_NO_LAST_MEETING, RECEIPT_UNAVAILABLE, relativeTime } from '../src/web/receipt-ui.js';
 import { SMOKE_PROPOSAL_ID } from '../src/db/smoke-ids.js';
 import { ALLOWED_SUPABASE_URL } from '../src/config/supabase-lock.js';
@@ -263,7 +263,9 @@ describe('E10 Dana v1.2 split-screen shell', () => {
     assert.match(card, /Expires/);
     const actions = read('components/chat/ConfirmActions.tsx');
     assert.match(actions, /CONFIRM_COPY/);
-    assert.match(actions, /confirmedLine/);
+    assert.match(actions, /terminalActionLine/);
+    assert.match(actions, /data-confirm-error/);
+    assert.match(actions, /persistTerminal/);
     const panel = read('components/workspace/DiffConfirmPanel.tsx');
     assert.match(panel, /workspace\.diff_confirm_panel/);
     assert.match(panel, /data-confirm-twin="true"/);
@@ -306,6 +308,10 @@ describe('E10 Dana v1.2 split-screen shell', () => {
     assert.equal(footnote.includes('cited'), false);
     const shell = read('components/shell/AppShell.tsx');
     assert.match(shell, /streamChatTurn/);
+    assert.match(shell, /rememberConfirmOutcome/);
+    assert.match(shell, /applyMessageConfirmCardTerminal/);
+    assert.match(shell, /actionError/);
+    assert.equal(shell.includes('setConfirmOutcome(null)'), false);
     assert.equal(shell.includes("role: 'tool'"), false);
     assert.match(read('lib/api.ts'), /\/v1\/ai\/chat/);
     assert.match(read('lib/api.ts'), /credentials: 'include'/);
@@ -323,6 +329,7 @@ describe('E10 Dana v1.2 split-screen shell', () => {
     assert.equal(css.includes('--veil-tint'), false);
     assert.equal(css.includes('#fafaf8'), false);
     assert.equal(css.includes('#1a1a1a'), false);
+    assert.match(css, /\.confirm-terminal-line/);
     assert.match(css, /confirm-inhale/);
     assert.match(css, /ease-out/);
     assert.match(css, /amber-pulse-once/);
@@ -337,8 +344,51 @@ describe('E10 Dana v1.2 split-screen shell', () => {
     assert.equal(CONFIRM_COPY.primary, 'Confirm change');
     assert.equal(CONFIRM_COPY.secondary, 'Dismiss proposal');
     assert.match(confirmedLine(new Date('2026-09-20T16:05:00')), /Confirmed · .+ · you/);
+    assert.match(dismissedLine(new Date('2026-09-20T16:05:00')), /Dismissed · .+ · you/);
+    assert.match(terminalActionLine('rejected', new Date('2026-09-20T16:05:00')), /Dismissed · .+ · you/);
     assert.equal(isUnreadEdgeClipped({ top: -8, bottom: 40 }, { top: 0, bottom: 100 }), true);
     assert.equal(isUnreadEdgeClipped({ top: 10, bottom: 40 }, { top: 0, bottom: 100 }), false);
+  });
+
+  it('keeps chat ConfirmCard terminal after confirm/dismiss without flipping twins', () => {
+    const card = confirmCard({
+      id: SMOKE_PROPOSAL_ID,
+      kind: 'holding_changes',
+      status: 'pending_confirm',
+      requires_role: 'manager',
+      preview: { title: 'Holding changes' },
+      payload: {},
+    });
+    const panel = workspacePanel({
+      id: SMOKE_PROPOSAL_ID,
+      kind: 'holding_changes',
+      status: 'pending_confirm',
+      requires_role: 'manager',
+      preview: { diff: [] },
+      payload: {},
+    });
+    assert.equal(assertSharedProposalId(card, panel), SMOKE_PROPOSAL_ID);
+    const patch = { status: 'confirmed', db_status: 'applied' };
+    const nextCard = applyTwinTerminalState(card, SMOKE_PROPOSAL_ID, patch);
+    const nextPanel = applyTwinTerminalState(panel, SMOKE_PROPOSAL_ID, patch);
+    assert.equal(nextCard.proposal_id, nextPanel.proposal_id);
+    assert.equal(nextCard.status, 'confirmed');
+    assert.equal(nextPanel.status, 'confirmed');
+    const outcomes = rememberConfirmOutcome({}, SMOKE_PROPOSAL_ID, 'confirmed', new Date('2026-09-21T16:05:00'));
+    const remembered = twinOutcome(outcomes, SMOKE_PROPOSAL_ID);
+    assert.equal(remembered.status, 'confirmed');
+    assert.equal(resolveTwinOutcome(null, SMOKE_PROPOSAL_ID, 'confirmed').status, 'confirmed');
+    assert.equal(resolveTwinOutcome(remembered, SMOKE_PROPOSAL_ID, 'pending').status, 'confirmed');
+    const messages = applyMessageConfirmCardTerminal(
+      [{ id: 'm1', confirmCard: card }],
+      SMOKE_PROPOSAL_ID,
+      patch
+    );
+    assert.equal(messages[0].confirmCard.status, 'confirmed');
+    const cardSrc = read('components/chat/ConfirmCard.tsx');
+    assert.match(cardSrc, /persistTerminal/);
+    const panelSrc = read('components/workspace/DiffConfirmPanel.tsx');
+    assert.match(panelSrc, /persistTerminal=\{false\}/);
   });
 
   it('scratchpad UI copy is DRAFT · what-if without changing the API watermark', () => {

@@ -21,13 +21,21 @@ import { ReportDraftView, type ReportDraft } from '@/components/workspace/Report
 import { WorkspaceHeader } from '@/components/workspace/WorkspaceHeader';
 import { callTool, streamChatTurn, v1Fetch } from '@/lib/api';
 import { createBrowserSupabase } from '@/lib/supabase/browser';
-import { actionPath, assertSharedProposalId } from '@/src/web/dual-confirm.js';
+import {
+  actionPath,
+  applyMessageConfirmCardTerminal,
+  applyTwinTerminalState,
+  assertSharedProposalId,
+  rememberConfirmOutcome,
+  twinOutcome,
+} from '@/src/web/dual-confirm.js';
 import { MOTION, SPLIT } from '@/src/web/tokens.js';
 import { parseComposerInput } from '@/src/web/parse-composer.js';
 import { discardedScratchpadState, SCRATCHPAD_FAIL_TOAST } from '@/src/web/scratchpad-ui.js';
 import { clampChatPct, resetChatPct } from '@/src/web/split.js';
 import { scrollDiffPanelIfClipped } from '@/src/web/confirm-ui.js';
 import { focusEntityLabel } from '@/src/web/receipt-ui.js';
+import { roleCanConfirm, roleCanReject } from '@/src/proposals/defaults.js';
 
 type SessionPayload = { user_id: string; firm_id: string; role: 'manager' | 'analyst' };
 type Option = { id: string; label: string; client_id?: string | null };
@@ -46,13 +54,6 @@ function newId() {
   return typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
     : `id-${Date.now()}-${Math.random()}`;
-}
-
-function roleCanConfirm(role: string | undefined, requiresRole: string | undefined) {
-  if (requiresRole === 'manager') {
-    return role === 'manager';
-  }
-  return role === 'manager' || role === 'analyst';
 }
 
 export function AppShell({
@@ -83,7 +84,8 @@ export function AppShell({
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [confirmOutcome, setConfirmOutcome] = useState<ConfirmOutcome>(null);
+  const [confirmOutcomes, setConfirmOutcomes] = useState<Record<string, ConfirmOutcome>>({});
+  const [actionError, setActionError] = useState<{ proposalId: string; message: string } | null>(null);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [modal, setModal] = useState<{ title: string; body: string } | null>(null);
   const [scratchpad, setScratchpad] = useState(() => discardedScratchpadState());
@@ -397,36 +399,48 @@ export function AppShell({
       return;
     }
     setBusy(true);
-    const result = await v1Fetch(path, { token, firmId, method });
-    setBusy(false);
+    setActionError(null);
     const confirming = path.endsWith('/confirm');
-    if (!result.ok) {
-      toast(scratchpad.open ? SCRATCHPAD_FAIL_TOAST : (result.error?.message ?? 'Proposal action failed'));
+    let result: Awaited<ReturnType<typeof v1Fetch<{ status?: string; db_status?: string }>>>;
+    try {
+      result = await v1Fetch(path, { token, firmId, method });
+    } catch (err) {
+      setBusy(false);
+      const message = err instanceof Error ? err.message : 'Proposal action failed';
+      setActionError({ proposalId, message });
+      toast(scratchpad.open ? SCRATCHPAD_FAIL_TOAST : message);
       return;
     }
-    if (confirming) {
-      const at = new Date();
-      setConfirmOutcome({ status: 'confirmed', at, proposalId });
-      if (scratchpad.open) {
-        setScratchpad((prev) => ({ ...prev, success: true, dissolving: true, open: true }));
-        setTimeout(() => {
-          setScratchpad(discardedScratchpadState());
-          setImpact(null);
-        }, MOTION.scratchpadDissolveMs);
-      }
-      if (successTimer.current) {
-        clearTimeout(successTimer.current);
-      }
-      successTimer.current = setTimeout(() => {
-        setPendingCard(null);
-        setPendingPanel(null);
-        setConfirmOutcome(null);
-      }, MOTION.successFadeMs);
-    } else {
-      setPendingCard(null);
-      setPendingPanel(null);
-      setConfirmOutcome(null);
+    setBusy(false);
+    if (!result.ok) {
+      const message = result.error?.message ?? 'Proposal action failed';
+      setActionError({ proposalId, message });
+      toast(scratchpad.open ? SCRATCHPAD_FAIL_TOAST : message);
+      return;
     }
+    const terminalStatus = confirming ? 'confirmed' : 'rejected';
+    const patch = {
+      status: result.data?.status && result.data.status !== 'pending' ? result.data.status : terminalStatus,
+      db_status: result.data?.db_status ?? null,
+    };
+    const at = new Date();
+    setMessages((list) => applyMessageConfirmCardTerminal(list, proposalId, patch) as ChatMessage[]);
+    setPendingCard((card) => applyTwinTerminalState(card, proposalId, patch) as ConfirmCardModel | null);
+    setPendingPanel((panel) => applyTwinTerminalState(panel, proposalId, patch) as DiffPanelModel | null);
+    setConfirmOutcomes((prev) => rememberConfirmOutcome(prev, proposalId, terminalStatus, at) as Record<string, ConfirmOutcome>);
+    if (confirming && scratchpad.open) {
+      setScratchpad((prev) => ({ ...prev, success: true, dissolving: true, open: true }));
+      setTimeout(() => {
+        setScratchpad(discardedScratchpadState());
+        setImpact(null);
+      }, MOTION.scratchpadDissolveMs);
+    }
+    if (successTimer.current) {
+      clearTimeout(successTimer.current);
+    }
+    successTimer.current = setTimeout(() => {
+      setPendingPanel((panel) => (panel?.proposal_id === proposalId ? null : panel));
+    }, MOTION.successFadeMs);
     if (portfolioId) {
       await loadFocusData({ client_id: clientId, portfolio_id: portfolioId });
     }
@@ -560,6 +574,11 @@ export function AppShell({
     apiSession?.role,
     pendingCard?.requires_role ?? pendingPanel?.requires_role
   );
+  const canReject = roleCanReject(apiSession?.role);
+  const activeOutcome = twinOutcome(
+    confirmOutcomes,
+    pendingCard?.proposal_id ?? pendingPanel?.proposal_id
+  );
 
   const workspaceTitle = useMemo(() => {
     if (workspaceMode === 'meeting') {
@@ -598,8 +617,10 @@ export function AppShell({
       panel={pendingPanel}
       highlighted={highlightId === pendingPanel.proposal_id}
       canConfirm={canConfirm}
+      canReject={canReject}
       busy={busy}
-      outcome={confirmOutcome}
+      outcome={twinOutcome(confirmOutcomes, pendingPanel.proposal_id)}
+      actionError={actionError}
       onSelect={pulseHighlight}
       onConfirm={(id, path, method) => void actOnProposal(id, path, method)}
       onReject={(id, path, method) => void actOnProposal(id, path, method)}
@@ -642,9 +663,11 @@ export function AppShell({
           busy={busy}
           highlightedProposalId={highlightId}
           canConfirm={canConfirm}
+          canReject={canReject}
           hideConfirmCard={scratchpad.open}
           pendingCard={pendingCard}
-          outcome={confirmOutcome}
+          outcomes={confirmOutcomes}
+          actionError={actionError}
           onSelectProposal={pulseHighlight}
           onConfirm={(id, path, method) => void actOnProposal(id, path, method)}
           onReject={(id, path, method) => void actOnProposal(id, path, method)}
@@ -692,7 +715,7 @@ export function AppShell({
             open={scratchpad.open}
             dissolving={scratchpad.dissolving}
             success={scratchpad.success}
-            confirmed={confirmOutcome?.status === 'confirmed'}
+            confirmed={activeOutcome?.status === 'confirmed'}
             asOf={asOf}
             portfolioId={portfolioId}
             impact={impactPayload as never}
