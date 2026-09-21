@@ -1,6 +1,7 @@
 /**
  * Fetch (Web Request/Response) adapter around createRequestListener.
  * Lets the Next.js App Router serve the same E0 /v1 HTTP API without forking routes.
+ * Supports buffered JSON (writeHead + end) and SSE (writeHead + write + end).
  */
 import { Readable } from 'node:stream';
 import { createRequestListener } from './http.js';
@@ -11,6 +12,19 @@ function headerMap(request) {
     headers[key.toLowerCase()] = value;
   }
   return headers;
+}
+
+function encodeChunk(chunk) {
+  if (chunk == null) {
+    return new Uint8Array();
+  }
+  if (typeof chunk === 'string') {
+    return new TextEncoder().encode(chunk);
+  }
+  if (chunk instanceof Uint8Array) {
+    return chunk;
+  }
+  return Buffer.from(chunk);
 }
 
 /**
@@ -39,6 +53,21 @@ export function createFetchHandler(options) {
       let status = 200;
       const headers = {};
       let ended = false;
+      let resolved = false;
+      let streamController = null;
+
+      function ensureStream() {
+        if (resolved) {
+          return;
+        }
+        resolved = true;
+        const stream = new ReadableStream({
+          start(controller) {
+            streamController = controller;
+          },
+        });
+        resolve(new Response(stream, { status, headers }));
+      }
 
       const res = {
         writeHead(code, hdrs) {
@@ -52,18 +81,34 @@ export function createFetchHandler(options) {
         setHeader(key, value) {
           headers[key] = value;
         },
+        write(chunk) {
+          if (ended) {
+            return false;
+          }
+          ensureStream();
+          streamController.enqueue(encodeChunk(chunk));
+          return true;
+        },
         end(payload) {
           if (ended) {
             return;
           }
           ended = true;
-          const body = payload == null ? null : payload;
-          resolve(new Response(body, { status, headers }));
+          if (!resolved) {
+            resolved = true;
+            const body = payload == null ? null : payload;
+            resolve(new Response(body, { status, headers }));
+            return;
+          }
+          if (payload != null && payload !== '') {
+            streamController.enqueue(encodeChunk(payload));
+          }
+          streamController.close();
         },
       };
 
       Promise.resolve(listener(req, res)).catch((err) => {
-        if (!ended) {
+        if (!ended && !resolved) {
           reject(err);
         }
       });

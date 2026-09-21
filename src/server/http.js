@@ -7,6 +7,7 @@ import { boot } from '../config/startup.js';
 import { isProductionEnv, resolveAppEnv, resolveCommitSha } from '../config/runtime-env.js';
 import { dispatchTool } from '../chat/tool-router.js';
 import { writeAuditEvent } from './audit.js';
+import { handleV1Chat } from './chat-http.js';
 import { ApiError } from './errors.js';
 import { completeToolSuccess } from './tool-response.js';
 import { bearerTokenFromHeader, verifySupabaseAccessToken } from './jwt.js';
@@ -36,6 +37,11 @@ const ERROR_STATUS = {
   not_sent: 409,
   unauthenticated: 401,
   invalid_args: 400,
+  openai_api_key_missing: 503,
+  openai_timeout: 504,
+  openai_spend_limit: 429,
+  openai_error: 503,
+  confirm_on_write: 409,
 };
 
 function send(res, status, body) {
@@ -122,6 +128,7 @@ export function createRequestListener({ env = process.env, deps = {} } = {}) {
     dispatch: deps.dispatch ?? dispatchTool,
     writeAudit: deps.writeAudit ?? writeAuditEvent,
     createUserClient: deps.createUserClient ?? createUserScopedClient,
+    chatProvider: deps.chatProvider,
   };
 
   return async function listener(req, res) {
@@ -299,6 +306,21 @@ export function createRequestListener({ env = process.env, deps = {} } = {}) {
           env: resolved.env,
         });
         await finishTool(res, result, session, resolved);
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/v1/ai/chat') {
+        const { token, session } = await authenticate(req, resolved);
+        const body = await readJsonBody(req);
+        await handleV1Chat({
+          req,
+          res,
+          body,
+          token,
+          session,
+          deps: resolved,
+          send,
+        });
         return;
       }
 

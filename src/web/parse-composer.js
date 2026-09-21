@@ -1,11 +1,13 @@
 /**
- * Composer talks to the existing E2 tool router. There is no model chat endpoint in E0–E9.
+ * Composer text classification. RFC-011: the E10 composer wires ONLY to
+ * POST /v1/ai/chat — slash/JSON/natural language are all sent as user turns.
+ * Confirm/reject stay on POST /v1/proposals/:id/{confirm,reject}, not the composer.
  *
  * Accepted input:
  *   /tool_name
  *   /tool_name { "arg": "value" }
  *   { "name": "tool_name", "args": { } }
- * Anything else is a local thread message (not sent to an invented LLM API).
+ * Anything else is a natural-language chat turn.
  */
 
 /**
