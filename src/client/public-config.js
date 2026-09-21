@@ -12,9 +12,8 @@ import {
 import { assertNoServiceRoleEnv, createChatToolEnv } from '../security/service-role-guard.js';
 
 /**
- * Keys that Edge middleware may read by name. Never enumerate `process.env` —
- * Vercel Edge `process.env` is not a plain object (`Object.entries` can throw
- * and take down the whole site with MIDDLEWARE_INVOCATION_FAILED).
+ * Keys read by name from public/runtime env. Never enumerate `process.env` —
+ * Vercel Edge `process.env` is not a plain object (`Object.entries` can throw).
  * Service-role / server secrets are intentionally absent from this list.
  */
 export const PUBLIC_SUPABASE_ENV_KEYS = Object.freeze([
@@ -43,7 +42,7 @@ function readEnvValue(env, key) {
 
 /**
  * Copy only public/runtime keys via named access. Blank strings count as unset.
- * Safe to pass `process.env` from Edge middleware.
+ * Safe to pass `process.env` even when it is not enumerable.
  * @param {Record<string, string | undefined>} env
  */
 export function pickPublicSupabaseEnv(env = {}) {
@@ -102,9 +101,8 @@ export function getPublicSupabaseConfig(env = {}) {
 }
 
 /**
- * Edge/middleware-safe read: never throws. Incomplete or refused public
- * config returns ok:false so Routing Middleware can fail-open instead of
- * 500 MIDDLEWARE_INVOCATION_FAILED. Error text is lock messages only — no secrets.
+ * Never throws. Incomplete or refused public config returns ok:false.
+ * Error text is lock messages only — no secrets.
  * @param {Record<string, string | undefined>} env
  */
 export function tryGetPublicSupabaseConfig(env = {}) {
