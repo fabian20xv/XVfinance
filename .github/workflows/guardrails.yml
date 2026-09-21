@@ -30,10 +30,13 @@ jobs:
           SUPABASE_URL: https://krcwpupbdizzjyydzaqp.supabase.co
           NEXT_PUBLIC_SUPABASE_URL: https://krcwpupbdizzjyydzaqp.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: build-placeholder-anon-key
-      - name: Edge middleware bundle must not include supabase-js
+      - name: Do not ship root middleware (Vercel Node ESM crash)
         run: |
-          test -f .next/server/middleware.js
-          if grep -q '@supabase' .next/server/middleware.js; then
-            echo 'Edge middleware still bundles @supabase — that crashes Vercel Edge (MIDDLEWARE_INVOCATION_FAILED)'
+          if [ -e middleware.ts ] || [ -e middleware.js ] || [ -e src/middleware.ts ] || [ -e src/middleware.js ]; then
+            echo 'Root middleware is deployed as /var/task/middleware.js and fails: Cannot find module next/server'
+            exit 1
+          fi
+          if [ -e .next/server/middleware.js ]; then
+            echo 'Next.js still emitted an Edge middleware bundle; remove middleware.ts so / is not gated'
             exit 1
           fi

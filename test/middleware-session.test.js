@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -98,20 +98,11 @@ describe('Preview middleware fail-open (public Supabase config)', () => {
     assert.equal(ok.config.url, DEVELOP_URL);
   });
 
-  it('Edge middleware is next/server-only pass-through (no supabase import graph)', () => {
-    const rootMw = read('middleware.ts');
-    assert.match(rootMw, /NextResponse\.next\(\{ request \}\)/);
-    assert.match(rootMw, /v1\//);
-    assert.match(rootMw, /health\$/);
-    assert.match(rootMw, /api\//);
-    assert.equal(/from ['"]@supabase/.test(rootMw), false);
-    assert.equal(/from ['"][^'"]*public-config/.test(rootMw), false);
-    assert.equal(/from ['"][^'"]*lib\/supabase/.test(rootMw), false);
-    assert.equal(rootMw.includes('createServerClient'), false);
-    assert.equal(rootMw.includes('getClaims'), false);
-    assert.equal(rootMw.includes('updateSession'), false);
-    assert.equal(rootMw.includes('SUPABASE_SERVICE_ROLE_KEY'), false);
-    assert.match(rootMw, /from 'next\/server'/);
+  it('does not ship root middleware (Vercel Node ESM cannot load next/server)', () => {
+    assert.equal(existsSync(join(root, 'middleware.ts')), false);
+    assert.equal(existsSync(join(root, 'middleware.js')), false);
+    assert.equal(existsSync(join(root, 'src/middleware.ts')), false);
+    assert.equal(existsSync(join(root, 'src/middleware.js')), false);
 
     const layout = read('app/layout.tsx');
     assert.equal(layout.includes('getPublicSupabaseConfig'), false);
