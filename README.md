@@ -76,9 +76,9 @@ Same listener (`createRequestListener` in `src/server/http.js`). Different proce
 
 | | Local | Vercel Preview / Production |
 | --- | --- | --- |
-| How it starts | `npm start` → `node src/index.js --serve` | Vercel invokes the Function at `api/index.js` (and `api/[...path].js` so `/api/health` is not a missing-file 404) |
+| How it starts | `npm start` → `node src/index.js --serve` | Next.js App Router (`app/`) plus the same listener via `app/api/*`, `app/v1/*`, and `api/index.js` |
 | Process | Long-lived `node:http` server, `PORT` default `8787` | One serverless invocation per request (Fluid Compute). No `node src/index.js --serve` |
-| Routing | `req.url` is the public path | `vercel.json` sends `/api/health`, `/api/smoke`, `/health`, and `/v1/*` to that Function. Non-`/api` paths are rewritten with `xv_path` so the listener still matches `/health` and `/v1/*` |
+| Routing | `req.url` is the public path | `vercel.json` sends `/api/health`, `/api/smoke`, `/health`, and `/v1/*` to the same listener (`xv_path` for `/health` and `/v1/*`). `/` is the E10 Dana shell — there is no catch-all rewrite |
 | Allowlist | `boot()` on process start | `boot()` on Function init (same `SUPABASE_URL` allowlist; develop ref refused when `VERCEL_ENV`/`APP_ENV` is production) |
 
 Do not run `--serve` on Vercel. Preview/staging `SUPABASE_URL` must be develop only (`bkwhqfkosxnoffpsjcug`). Never parent `krcwpupbdizzjyydzaqp` on Preview.
