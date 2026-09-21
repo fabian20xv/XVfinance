@@ -21,7 +21,8 @@ export async function createServerSupabase() {
             cookieStore.set(name, value, options)
           );
         } catch {
-          // Server Components cannot set cookies; middleware refreshes the session.
+          // Server Components cannot set cookies. Edge middleware is pass-through
+          // (supabase-js is not Edge-safe here); AuthGate refreshes in the browser.
         }
       },
     },

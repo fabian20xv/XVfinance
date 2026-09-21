@@ -30,3 +30,10 @@ jobs:
           SUPABASE_URL: https://krcwpupbdizzjyydzaqp.supabase.co
           NEXT_PUBLIC_SUPABASE_URL: https://krcwpupbdizzjyydzaqp.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: build-placeholder-anon-key
+      - name: Edge middleware bundle must not include supabase-js
+        run: |
+          test -f .next/server/middleware.js
+          if grep -q '@supabase' .next/server/middleware.js; then
+            echo 'Edge middleware still bundles @supabase — that crashes Vercel Edge (MIDDLEWARE_INVOCATION_FAILED)'
+            exit 1
+          fi
