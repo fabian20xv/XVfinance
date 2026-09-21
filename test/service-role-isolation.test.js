@@ -16,7 +16,7 @@ import { createServiceRoleClient, getServiceRoleKey } from '../src/server/servic
 
 const LOCKED_URL = 'https://krcwpupbdizzjyydzaqp.supabase.co';
 const ROOT = join(import.meta.dirname, '..');
-const SCAN_DIRS = ['src/chat', 'src/client', 'src/web', 'app', 'components', 'lib'];
+const SCAN_DIRS = ['src/chat', 'src/client', 'src/web', 'src/ai', 'app', 'components', 'lib'];
 const SCAN_EXT = ['.js', '.ts', '.tsx', '.mjs'];
 const FORBIDDEN_IN_CHAT_CLIENT = [
   'SUPABASE_SERVICE_ROLE_KEY',
@@ -59,6 +59,7 @@ describe('CA-0.2 service-role key isolation', () => {
       SUPABASE_ANON_KEY: 'anon-key',
       SUPABASE_SERVICE_ROLE_KEY: 'super-secret-service-role',
       SUPABASE_SECRET_KEY: 'also-secret',
+      OPENAI_API_KEY: 'sk-live-must-not-reach-tools',
       NODE_ENV: 'test',
     });
 
@@ -67,6 +68,7 @@ describe('CA-0.2 service-role key isolation', () => {
     assert.equal(isolated.NODE_ENV, 'test');
     assert.equal(isolated.SUPABASE_SERVICE_ROLE_KEY, undefined);
     assert.equal(isolated.SUPABASE_SECRET_KEY, undefined);
+    assert.equal(isolated.OPENAI_API_KEY, undefined);
     assert.equal('SUPABASE_SERVICE_ROLE_KEY' in isolated, false);
     assert.throws(() => {
       isolated.SUPABASE_SERVICE_ROLE_KEY = 'leak';

@@ -1,11 +1,11 @@
 /**
- * Composer talks to the existing E2 tool router. There is no model chat endpoint in E0–E9.
+ * Composer: slash/JSON still hits POST /v1/tools. Natural language hits POST /v1/chat.
  *
  * Accepted input:
  *   /tool_name
  *   /tool_name { "arg": "value" }
  *   { "name": "tool_name", "args": { } }
- * Anything else is a local thread message (not sent to an invented LLM API).
+ * Anything else is a chat turn (E11 agent runtime).
  */
 
 /**

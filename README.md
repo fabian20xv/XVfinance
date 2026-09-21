@@ -36,9 +36,10 @@ The service-role key is a server secret. It must never reach the model, the chat
 | --- | --- |
 | `src/server/` (e.g. `service-role.js`) | Yes — only locked-down server modules |
 | `src/chat/` (tool runner + user-JWT client) | No — user JWT + anon/publishable key; env is stripped |
+| `src/ai/` (prompts, OpenAI turn loop, tool adapters) | No — same as chat; tools run through `tool-router` |
 | `src/client/` | No — public URL + anon/publishable key only |
 
-`createChatToolRunner` builds a frozen env **without** service-role secrets and requires a user JWT so RLS applies. ESLint rule `xvfinance/no-service-role-in-chat` (chat + client files) and `test/service-role-isolation.test.js` fail if those trees read the key or import `src/server`. The service-role key lives only in `src/server/service-role.js`. Tess smoke uses the user-JWT client so RLS applies.
+`createChatToolRunner` builds a frozen env **without** service-role secrets and requires a user JWT so RLS applies. ESLint rule `xvfinance/no-service-role-in-chat` (chat + ai + client files) and `test/service-role-isolation.test.js` fail if those trees read the key or import `src/server`. The service-role key lives only in `src/server/service-role.js`. Tess smoke uses the user-JWT client so RLS applies.
 
 ## Tess health / smoke (E0 HTTP API)
 
@@ -133,6 +134,7 @@ npm start   # node src/index.js --serve  (requires SUPABASE_URL; PORT default 87
 # GET  /health          — no JWT
 # GET  /v1/session      — Authorization: Bearer <user jwt>
 # POST /v1/tools        — { "name": "get_session"|"health", "args": {} }
+# POST /v1/chat         — { "messages": [{ "role": "user", "content": "..." }] }  (SSE or JSON; OpenAI + allowlisted tools)
 # GET  /v1/proposals
 # GET  /v1/proposals/:id
 # GET  /v1/proposals/:id/confirm-card
@@ -230,19 +232,52 @@ Next.js App Router UI at `app/` (same repo as the Node `/v1` server). Design pac
 | Confirm pulse | ConfirmCard + DiffConfirmPanel share `proposal_id`. Select/focus (never hover) inhales both borders once (600ms ease-out). Primary **Confirm change**; secondary **Dismiss proposal**. Success: **Confirmed · {time} · you**, then fade ~1.2s. `POST /v1/proposals/:id/confirm` / `reject` |
 | Scratchpad | Veil over the right pane only (not a tab). Diagonal **DRAFT · what-if** at 8–12%. Subline: **Won’t change positions until you confirm.** `GET /v1/scratchpads/:id/impact`. Promote → `scratchpad_promote` manager dual-confirm. ConfirmCard is absent while the veil is open. Success dissolves upward; fail keeps the watermark and toasts **Not applied — still draft.** Discard dissolves in 200ms with no source-of-truth persist |
 | Receipts | Marks **[1]** (not “citation”). Side-slip popover beside the mark (120–160ms fade + 2px rise). Title is source type + relative time; one factual body line; **Open in workspace** only when `path` is present. Missing/RLS → dashed **[?]** **Not available for this account**. `public_url` is always `null`. Email/Export → `propose_meeting_send` |
-| Composer | Stays unlocked while confirm is pending. Dispatches allowlisted `POST /v1/tools` (no invented model chat API) |
+| Composer | Stays unlocked while confirm is pending. Natural language → `POST /v1/chat` (E11). Slash/JSON still `POST /v1/tools`. Confirm/reject proposals unchanged. |
 | SpeakReadyToggle | Deferred to epic 1.5 (file kept, not mounted) |
 
 Out of scope: CRM, optimizer, news firehose, scenario libraries, dark mode.
 
 Preview/dev web env may use develop ref `bkwhqfkosxnoffpsjcug`. Production must use parent `krcwpupbdizzjyydzaqp`.
 
+## Agent chat runtime (E11)
+
+Left-pane natural language runs an OpenAI-primary tool loop over the existing E2 allowlist. Writes still stop at a pending proposal — ConfirmCard / DiffConfirmPanel apply them.
+
+Layout (mirrors `src/ai/{prompts,runtime,tools}`):
+
+| Path | Role |
+| --- | --- |
+| `src/ai/prompts/` | PM brief, confirm-on-write rules, top-10 Portfolio Manager jobs. Impact Scratchpad + Meeting Ghostwriter/Receipts called out as differentiators. |
+| `src/ai/runtime/` | OpenAI Chat Completions turn loop: messages in → model with tools → execute allowlisted tools (user JWT + RLS) → stream/accumulate assistant reply. Timeouts and spend-safe defaults (`gpt-4o-mini`, capped rounds/tokens). |
+| `src/ai/tools/` | Thin adapters: OpenAI function definitions from `src/chat` JSON Schema. Handlers stay in `tool-router`. `confirm_proposal` / `reject_proposal` are **not** model-callable. |
+
+`src/ai/` is on the same service-role ban as `src/chat/` (ESLint + source scan). The HTTP listener (`POST /v1/chat`) authenticates like `POST /v1/tools` (bearer **user** JWT). Tool execution never sees `SUPABASE_SERVICE_ROLE_KEY` or `OPENAI_API_KEY`.
+
+**Required env:** `OPENAI_API_KEY` on Preview and Production. If it is missing or a placeholder, the endpoint returns `503` `{ "error": { "code": "openai_api_key_missing" } }` — it does not invent a successful reply. Optional: `OPENAI_MODEL` (default `gpt-4o-mini`), `OPENAI_BASE_URL`.
+
+### Try one chat turn on Preview (develop Supabase + OpenAI)
+
+1. Vercel Preview env: `SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_URL` = develop `https://bkwhqfkosxnoffpsjcug.supabase.co` (never parent on Preview), matching develop anon key, **and** `OPENAI_API_KEY`.
+2. Sign in as a Tess develop user (see [`docs/tess-develop-seed.md`](docs/tess-develop-seed.md)).
+3. In the left composer, type a natural-language turn (not a `/tool` slash), e.g. `What's in session context?` or `How concentrated is this book?`.
+4. Confirm the network call is `POST /v1/chat` with `Authorization: Bearer <user jwt>`. Slash commands such as `/get_session_context` still hit `POST /v1/tools`.
+5. If the agent proposes a write, Confirm change / Dismiss proposal still go to `POST /v1/proposals/:id/confirm` and `/reject` — not the model.
+
+Local JSON (no stream) against `npm start`:
+
+```bash
+curl -sS http://127.0.0.1:8787/v1/chat \
+  -H "Authorization: Bearer $USER_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"stream":false,"messages":[{"role":"user","content":"What is my session?"}]}'
+```
+
 ## Setup
 
 ```bash
 cp .env.example .env   # placeholders only; never commit real keys
 npm install
-npm run ci             # lock assert + lint + tests (E0–E10)
+npm run ci             # lock assert + lint + tests (E0–E11)
 # Server-only, locked project only (requires real SUPABASE_SERVICE_ROLE_KEY):
 npm run seed                    # parent/prod smoke fixture only
 npm run seed:tess -- --dry-run  # develop URL guard; no writes
@@ -259,7 +294,7 @@ node --env-file=.env src/index.js --serve
 # or: npm start
 ```
 
-The API still listens on `PORT` (default `8787`). It is unchanged: health, smoke, `/v1/session`, `/v1/tools`, proposals, scratchpad impact, meeting receipts.
+The API still listens on `PORT` (default `8787`). It is unchanged for E0–E10 routes; E11 adds `POST /v1/chat` (health, smoke, `/v1/session`, `/v1/tools`, proposals, scratchpad impact, meeting receipts).
 
 Start the E10 web shell (App Router). Next.js also serves `/v1`, `/health`, `/api/health`, and `/api/smoke` through the same `createRequestListener`, so `npm run web` is enough for local UI + API. Keep `npm start` when you want the Node listener alone:
 

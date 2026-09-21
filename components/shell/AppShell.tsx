@@ -19,7 +19,7 @@ import { EmptyWorkspace } from '@/components/workspace/EmptyWorkspace';
 import { HoldingsTable, type CashStrip, type HoldingRow } from '@/components/workspace/HoldingsTable';
 import { ReportDraftView, type ReportDraft } from '@/components/workspace/ReportDraftView';
 import { WorkspaceHeader } from '@/components/workspace/WorkspaceHeader';
-import { callTool, v1Fetch } from '@/lib/api';
+import { callTool, streamChatTurn, v1Fetch } from '@/lib/api';
 import { actionPath, assertSharedProposalId } from '@/src/web/dual-confirm.js';
 import { MOTION, SPLIT } from '@/src/web/tokens.js';
 import { parseComposerInput } from '@/src/web/parse-composer.js';
@@ -252,11 +252,95 @@ export function AppShell({
       return;
     }
     if (parsed.type === 'message') {
-      pushMessage({
-        id: newId(),
-        role: 'assistant',
-        text: 'No model chat endpoint in E0–E9. Dispatch an allowlisted tool with /tool_name {json} or {"name","args"}.',
+      const history = messages
+        .filter((row) => row.role === 'user' || row.role === 'assistant')
+        .map((row) => ({ role: row.role, content: row.text }))
+        .concat({ role: 'user', content: parsed.text });
+      const assistantId = newId();
+      pushMessage({ id: assistantId, role: 'assistant', text: '' });
+      setBusy(true);
+      let assembled = '';
+      const result = await streamChatTurn(token, firmId, history, {
+        onDelta: (chunk) => {
+          assembled += chunk;
+          setMessages((list) =>
+            list.map((row) => (row.id === assistantId ? { ...row, text: assembled } : row))
+          );
+        },
+        onTool: (event) => {
+          if (!event.name) {
+            return;
+          }
+          setMessages((list) => {
+            const existing = list.find((row) => row.toolName === event.name && row.role === 'tool' && row.toolStatus === 'running');
+            if (event.status === 'running' && !existing) {
+              return [
+                ...list,
+                {
+                  id: newId(),
+                  role: 'tool' as const,
+                  text: `tool ${event.name}`,
+                  toolName: event.name,
+                  toolStatus: 'running',
+                },
+              ];
+            }
+            return list.map((row) =>
+              row.role === 'tool' && row.toolName === event.name && (row.toolStatus === 'running' || row.id === existing?.id)
+                ? {
+                    ...row,
+                    toolStatus: event.status ?? row.toolStatus,
+                    text: event.error?.message ?? row.text,
+                  }
+                : row
+            );
+          });
+        },
       });
+      setBusy(false);
+      if (!result.ok) {
+        const message = result.error?.message ?? 'Chat turn failed.';
+        setMessages((list) =>
+          list.map((row) => (row.id === assistantId ? { ...row, text: assembled || message } : row))
+        );
+        toast(message);
+        return;
+      }
+      const data = {
+        ...(typeof result.confirm_card === 'object' && result.confirm_card ? { confirm_card: result.confirm_card } : {}),
+        ...(typeof result.workspace_panel === 'object' && result.workspace_panel
+          ? { workspace_panel: result.workspace_panel }
+          : {}),
+      } as Record<string, unknown>;
+      attachProposal(data);
+      const pending = Boolean(
+        result.confirm_card &&
+          typeof result.confirm_card === 'object' &&
+          (result.confirm_card as ConfirmCardModel).status === 'pending'
+      );
+      setMessages((list) =>
+        list.map((row) =>
+          row.id === assistantId
+            ? {
+                ...row,
+                text: result.text || assembled || row.text,
+                confirmCard: (result.confirm_card as ConfirmCardModel | undefined) ?? undefined,
+                toolStatus: pending ? 'pending_confirm' : undefined,
+              }
+            : row
+        )
+      );
+      const meeting = result.artifacts?.meeting as MeetingReport | undefined;
+      if (meeting) {
+        setMeetingMissing(false);
+        setMeeting(meeting);
+        setWorkspaceMode('meeting');
+      }
+      const report = result.artifacts?.report as ReportDraft | undefined;
+      if (report) {
+        setReport(report);
+        setWorkspaceMode('report');
+      }
       return;
     }
     const runningId = newId();

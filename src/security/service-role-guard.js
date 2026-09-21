@@ -16,6 +16,7 @@ export const SERVICE_ROLE_ENV_KEYS = Object.freeze([
 export const SERVER_ONLY_ENV_KEYS = Object.freeze([
   'SUPABASE_JWT_SECRET',
   'JWT_SECRET',
+  'OPENAI_API_KEY',
 ]);
 
 const serviceRoleClients = new WeakSet();
