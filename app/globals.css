@@ -39,6 +39,9 @@
   --receipt-slip-ms: 140ms;
   --amber-pulse-ms: 500ms;
   --confirmed-delta-ms: 800ms;
+  --speak-body-size: 18px;
+  --speak-body-line: 28px;
+  --speak-chrome-opacity: 0.4;
 }
 
 html,
@@ -609,55 +612,35 @@ body {
   opacity: 0.45;
 }
 
-/* Speak 1.5: chrome recedes to ink-muted at 40%. The toggle stays full strength so it can turn off. */
-.app-root.is-speak-ready .top-bar > :not(.speak-ready-toggle),
-.app-root.is-speak-ready .pane-chat,
-.app-root.is-speak-ready .split-handle,
-.app-root.is-speak-ready .workspace-header {
+.app-root.is-speak-ready .speak-ready-dim {
   color: var(--ink-muted);
-  opacity: 0.4;
+  opacity: var(--speak-chrome-opacity);
 }
 
-.speak-ready-toggle {
-  gap: 6px;
+.app-root.is-speak-ready .speak-ready-dim:focus-within,
+.app-root.is-speak-ready .speak-ready-toggle {
+  opacity: 1;
 }
 
-.speak-ready-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--line);
+.app-root.is-speak-ready .meeting-one-pager--speak {
+  font-size: var(--speak-body-size);
+  line-height: var(--speak-body-line);
 }
 
-.speak-ready-dot.is-on {
-  background: var(--amber-pulse);
-}
-
-.speak-ready-key {
-  font: inherit;
-  font-size: 10px;
-  line-height: 1;
-  padding: 2px 4px;
-  border-radius: 4px;
-  border: 1px solid var(--line);
-  color: var(--ink-muted);
-}
-
-.meeting-one-pager.is-enlarged {
-  max-width: 68ch;
-  padding: 8px 4px 28px;
-}
-
-.meeting-one-pager.is-enlarged h2 {
-  font-size: 28px;
-  line-height: 34px;
-  letter-spacing: -0.02em;
-}
-
-.meeting-one-pager.is-enlarged .meeting-body {
-  font-size: 18px;
+.app-root.is-speak-ready .meeting-one-pager--speak h2 {
+  font-size: 22px;
   line-height: 28px;
-  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.app-root.is-speak-ready .meeting-one-pager--speak h3 {
+  font-size: 12px;
+}
+
+.app-root.is-speak-ready .meeting-one-pager--speak p,
+.app-root.is-speak-ready .meeting-one-pager--speak .section-body {
+  font-size: var(--speak-body-size);
+  line-height: var(--speak-body-line);
 }
 
 .stream-caret {

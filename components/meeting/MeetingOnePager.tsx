@@ -41,7 +41,7 @@ export function MeetingOnePager({
     }
     setUncontrolledOpen(index);
   };
-  const pagerClass = enlarged ? 'meeting-one-pager is-enlarged' : 'meeting-one-pager';
+  const pagerClass = enlarged ? 'meeting-one-pager meeting-one-pager--speak' : 'meeting-one-pager';
   if (!report) {
     return (
       <div className={pagerClass} data-meeting-one-pager="true" data-speak-ready={enlarged ? 'true' : 'false'}>
@@ -59,6 +59,7 @@ export function MeetingOnePager({
   const bodyStyle = enlarged
     ? { margin: 0, whiteSpace: 'pre-wrap' as const }
     : { margin: 0, fontSize: 13, whiteSpace: 'pre-wrap' as const };
+  const bodyClass = enlarged ? 'section-body' : undefined;
   return (
     <article
       data-public-url="null"
@@ -78,7 +79,7 @@ export function MeetingOnePager({
               <h3
                 style={{
                   margin: '0 0 10px',
-                  fontSize: 11,
+                  ...(enlarged ? {} : { fontSize: 11 }),
                   letterSpacing: '0.05em',
                   textTransform: 'uppercase',
                   color: 'var(--ink-muted)',
@@ -87,7 +88,7 @@ export function MeetingOnePager({
               >
                 {section.heading}
               </h3>
-              <p className={enlarged ? 'meeting-body' : undefined} style={bodyStyle}>
+              <p className={bodyClass} style={bodyStyle}>
                 <TextWithReceiptMarks
                   text={section.body ?? ''}
                   receipts={receipts}
@@ -99,7 +100,7 @@ export function MeetingOnePager({
             </section>
           ))
         : (
-          <p className={enlarged ? 'meeting-body' : undefined} style={bodyStyle}>
+          <p className={bodyClass} style={bodyStyle}>
             <TextWithReceiptMarks
               text={report.body ?? ''}
               receipts={receipts}

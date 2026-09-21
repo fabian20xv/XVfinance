@@ -13,8 +13,10 @@ export const SPEAK_READY_BODY = Object.freeze({
 /** Shell chrome recedes to ink-muted at about 40% while the 1-pager stays full ink. */
 export const SPEAK_READY_CHROME_ALPHA = 0.4;
 
-/** Open or advance the receipt side-slip. Ignored while typing in a field. */
+/** Open the first receipt side-slip. Ignored while typing. Already-open is a no-op. */
 export const SPEAK_RECEIPTS_KEY = 'r';
+
+export const SPEAK_EMPTY_RECEIPTS = 'No receipts on this 1-pager';
 
 /**
  * @param {boolean} ready
@@ -41,7 +43,7 @@ export function isTypingTarget(target) {
 /**
  * @param {{ key?: string, repeat?: boolean, metaKey?: boolean, ctrlKey?: boolean, altKey?: boolean, target?: EventTarget | { tagName?: string, isContentEditable?: boolean } | null }} event
  * @param {{ speakReady?: boolean, receiptCount?: number, openIndex?: number | null }} state
- * @returns {{ type: 'ignore' } | { type: 'open', index: number } | { type: 'cycle', index: number }}
+ * @returns {{ type: 'ignore' } | { type: 'empty' } | { type: 'open', index: number }}
  */
 export function speakReceiptShortcut(event, state) {
   if (!state?.speakReady) {
@@ -59,11 +61,11 @@ export function speakReceiptShortcut(event, state) {
   }
   const count = Number(state.receiptCount) || 0;
   if (count < 1) {
-    return { type: 'ignore' };
+    return { type: 'empty' };
   }
   const open = state.openIndex;
   if (open == null || open < 0 || open >= count) {
     return { type: 'open', index: 0 };
   }
-  return { type: 'cycle', index: (open + 1) % count };
+  return { type: 'ignore' };
 }

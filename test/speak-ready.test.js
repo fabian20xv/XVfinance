@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
+  SPEAK_EMPTY_RECEIPTS,
   SPEAK_READY_BODY,
   SPEAK_READY_CHROME_ALPHA,
   SPEAK_RECEIPTS_KEY,
@@ -22,29 +23,30 @@ describe('Speak 1.5 speak-ready meeting mode', () => {
     assert.equal(SPEAK_READY_BODY.fontSizePx, 18);
     assert.equal(SPEAK_READY_BODY.lineHeightPx, 28);
     assert.equal(SPEAK_READY_CHROME_ALPHA, 0.4);
+    assert.equal(SPEAK_EMPTY_RECEIPTS, 'No receipts on this 1-pager');
     assert.equal(resolveSpeakReady(true, 'meeting'), true);
     assert.equal(resolveSpeakReady(false, 'meeting'), false);
     assert.equal(resolveSpeakReady(true, 'live'), false);
     assert.equal(resolveSpeakReady(true, 'report'), false);
   });
 
-  it('opens and cycles receipts on R and ignores typing and speak-off', () => {
+  it('opens the first receipt on R, ignores an open slip, and ignores typing', () => {
     assert.equal(SPEAK_RECEIPTS_KEY, 'r');
     const opened = speakReceiptShortcut(
       { key: 'r', target: { tagName: 'BODY' } },
       { speakReady: true, receiptCount: 2, openIndex: null }
     );
     assert.deepEqual(opened, { type: 'open', index: 0 });
-    const cycled = speakReceiptShortcut(
+    const alreadyOpen = speakReceiptShortcut(
       { key: 'R', target: { tagName: 'DIV' } },
       { speakReady: true, receiptCount: 2, openIndex: 0 }
     );
-    assert.deepEqual(cycled, { type: 'cycle', index: 1 });
-    const wrapped = speakReceiptShortcut(
+    assert.deepEqual(alreadyOpen, { type: 'ignore' });
+    const reopened = speakReceiptShortcut(
       { key: 'r', target: { tagName: 'BODY' } },
-      { speakReady: true, receiptCount: 2, openIndex: 1 }
+      { speakReady: true, receiptCount: 2, openIndex: null }
     );
-    assert.deepEqual(wrapped, { type: 'cycle', index: 0 });
+    assert.deepEqual(reopened, { type: 'open', index: 0 });
     assert.equal(
       speakReceiptShortcut(
         { key: 'r', target: { tagName: 'TEXTAREA' } },
@@ -78,7 +80,7 @@ describe('Speak 1.5 speak-ready meeting mode', () => {
         { key: 'r', target: { tagName: 'BODY' } },
         { speakReady: true, receiptCount: 0, openIndex: null }
       ).type,
-      'ignore'
+      'empty'
     );
   });
 
@@ -108,19 +110,31 @@ describe('Speak 1.5 speak-ready meeting mode', () => {
     assert.match(toggle, /aria-keyshortcuts/);
     assert.match(toggle, /shell\.speak_ready_toggle/);
 
-    assert.match(pager, /is-enlarged/);
-    assert.match(pager, /meeting-body/);
+    assert.match(pager, /meeting-one-pager--speak/);
+    assert.match(pager, /section-body/);
     assert.match(pager, /data-speak-body/);
 
     assert.match(header, /workspace-header/);
     assert.match(header, /workspace\.leave_meeting/);
     assert.match(header, /Leave meeting/);
 
-    assert.match(css, /is-speak-ready/);
-    assert.match(css, /--ink-muted/);
-    assert.match(css, /opacity:\s*0\.4/);
-    assert.match(css, /\.meeting-one-pager\.is-enlarged \.meeting-body[\s\S]*font-size:\s*18px/);
-    assert.match(css, /line-height:\s*28px/);
+    assert.match(css, /--speak-body-size:\s*18px/);
+    assert.match(css, /--speak-body-line:\s*28px/);
+    assert.match(css, /--speak-chrome-opacity:\s*0\.4/);
+    assert.match(css, /\.speak-ready-dim/);
+    assert.match(css, /meeting-one-pager--speak/);
+    assert.match(css, /color:\s*var\(--ink-muted\)/);
+    assert.match(css, /opacity:\s*var\(--speak-chrome-opacity\)/);
+    assert.match(read('components/shell/FirmContextBar.tsx'), /speak-ready-dim/);
+    assert.match(read('components/shell/FocusChip.tsx'), /speak-ready-dim/);
+    assert.match(shell, /speak-ready-dim/);
+    assert.match(shell, /SPEAK_EMPTY_RECEIPTS/);
+    assert.equal(read('components/meeting/SendMeetingBar.tsx').includes('speak-ready'), false);
+    assert.equal(shell.includes('getUserMedia'), false);
+    assert.equal(shell.includes('SpeechRecognition'), false);
+    assert.match(toggle, /speak-ready-toggle/);
+    assert.match(toggle, /is-on/);
+    assert.match(toggle, /Speak ready — press R to open receipts/);
 
     assert.equal(http.includes('/v1/speak'), false);
     assert.equal(existsSync(join(root, 'middleware.ts')), false);

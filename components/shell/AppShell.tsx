@@ -36,7 +36,7 @@ import { discardedScratchpadState, SCRATCHPAD_FAIL_TOAST } from '@/src/web/scrat
 import { clampChatPct, resetChatPct } from '@/src/web/split.js';
 import { scrollDiffPanelIfClipped } from '@/src/web/confirm-ui.js';
 import { focusEntityLabel } from '@/src/web/receipt-ui.js';
-import { resolveSpeakReady, speakReceiptShortcut } from '@/src/web/speak-ready.js';
+import { SPEAK_EMPTY_RECEIPTS, resolveSpeakReady, speakReceiptShortcut } from '@/src/web/speak-ready.js';
 import { roleCanConfirm, roleCanReject } from '@/src/proposals/defaults.js';
 
 type SessionPayload = { user_id: string; firm_id: string; role: 'manager' | 'analyst' };
@@ -97,6 +97,7 @@ export function AppShell({
   const [asOf, setAsOf] = useState<string | null>(null);
   const drag = useRef<{ startX: number; startPct: number } | null>(null);
   const sendingRef = useRef(false);
+  const emptyReceiptToast = useRef(false);
 
   const firmId = apiSession?.firm_id ?? null;
 
@@ -238,6 +239,7 @@ export function AppShell({
   if (meetingOpen !== speakGate) {
     setSpeakGate(meetingOpen);
     if (!meetingOpen) {
+      emptyReceiptToast.current = false;
       setSpeakReady(false);
       setReceiptOpenIndex(null);
     }
@@ -259,14 +261,22 @@ export function AppShell({
         return;
       }
       event.preventDefault();
+      if (action.type === 'empty') {
+        if (!emptyReceiptToast.current) {
+          emptyReceiptToast.current = true;
+          toast(SPEAK_EMPTY_RECEIPTS);
+        }
+        return;
+      }
       setReceiptOpenIndex(action.index);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [speakLive, receiptCount, receiptOpenIndex]);
+  }, [speakLive, receiptCount, receiptOpenIndex, toast]);
 
   const onSpeakReadyChange = (next: boolean) => {
     if (!next || workspaceMode !== 'meeting') {
+      emptyReceiptToast.current = false;
       setSpeakReady(false);
       setReceiptOpenIndex(null);
       return;
@@ -275,6 +285,7 @@ export function AppShell({
   };
 
   const leaveMeeting = () => {
+    emptyReceiptToast.current = false;
     setSpeakReady(false);
     setReceiptOpenIndex(null);
     setWorkspaceMode('live');
@@ -704,10 +715,10 @@ export function AppShell({
         {workspaceMode === 'meeting' ? (
           <SpeakReadyToggle ready={speakLive} onChange={onSpeakReadyChange} />
         ) : null}
-        <Button variant="ghost" onClick={() => setChatPct(resetChatPct())}>
+        <Button variant="ghost" className="speak-ready-dim" onClick={() => setChatPct(resetChatPct())}>
           Reset 56/44
         </Button>
-        <Button variant="ghost" onClick={onSignOut}>
+        <Button variant="ghost" className="speak-ready-dim" onClick={onSignOut}>
           Sign out
         </Button>
       </header>

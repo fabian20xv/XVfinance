@@ -13,7 +13,7 @@ export function FirmContextBar({
 }) {
   const tone = role === 'manager' ? 'accent' : role === 'analyst' ? 'default' : 'warn';
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+    <div className="speak-ready-dim" style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
       <strong style={{ fontSize: 13 }}>XVfinance</strong>
       <span
         className="tabular"
