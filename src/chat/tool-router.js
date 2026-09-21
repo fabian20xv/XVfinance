@@ -2,10 +2,7 @@
  * Chat tool router: allowlist + JSON Schema + user-JWT client (RLS).
  * Never imports server/service-role modules.
  */
-import {
-  ALLOWED_SUPABASE_PROJECT_REF,
-  ALLOWED_SUPABASE_URL,
-} from '../config/supabase-lock.js';
+import { assertAllowedSupabaseUrl } from '../config/supabase-lock.js';
 import {
   assertNoServiceRoleEnv,
   assertNotServiceRoleClient,
@@ -45,18 +42,21 @@ const CORE_TOOLS = {
     },
   },
   health: {
-    description: 'Liveness probe for the locked Supabase project.',
+    description: 'Liveness probe for the runtime-locked Supabase project.',
     schema: {
       type: 'object',
       additionalProperties: false,
       properties: {},
     },
     audit: null,
-    async handler() {
+    async handler({ env }) {
+      // Same source as GET /api/health: SUPABASE_URL via the allowlist lock.
+      // Never echo the parent constant when Preview/staging is locked to develop.
+      const locked = assertAllowedSupabaseUrl(env?.SUPABASE_URL);
       return {
         status: 'ok',
-        project_ref: ALLOWED_SUPABASE_PROJECT_REF,
-        supabase_url: ALLOWED_SUPABASE_URL,
+        project_ref: locked.ref,
+        supabase_url: locked.url,
       };
     },
   },

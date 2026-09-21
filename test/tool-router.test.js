@@ -6,6 +6,8 @@ import { SMOKE_FIRM_ID, SMOKE_MANAGER_ID } from '../src/db/smoke-ids.js';
 import { markServiceRoleClient } from '../src/security/service-role-guard.js';
 
 const LOCKED_URL = 'https://krcwpupbdizzjyydzaqp.supabase.co';
+const DEVELOP_URL = 'https://bkwhqfkosxnoffpsjcug.supabase.co';
+const DEVELOP_REF = 'bkwhqfkosxnoffpsjcug';
 const session = {
   userId: SMOKE_MANAGER_ID,
   firmId: SMOKE_FIRM_ID,
@@ -98,7 +100,7 @@ describe('CA-2.2 tool router', () => {
     );
   });
 
-  it('returns the locked project from the health stub', async () => {
+  it('returns the runtime locked project from the health tool (parent env)', async () => {
     const result = await dispatchTool({
       name: 'health',
       args: {},
@@ -110,5 +112,20 @@ describe('CA-2.2 tool router', () => {
     assert.equal(result.ok, true);
     assert.equal(result.data.project_ref, 'krcwpupbdizzjyydzaqp');
     assert.equal(result.data.supabase_url, LOCKED_URL);
+  });
+
+  it('reports the develop ref from SUPABASE_URL, not the parent constant', async () => {
+    const result = await dispatchTool({
+      name: 'health',
+      args: {},
+      session,
+      userJwt: 'user-jwt',
+      env: { ...env, SUPABASE_URL: DEVELOP_URL },
+      createUserClient: () => ({ kind: 'user' }),
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.data.project_ref, DEVELOP_REF);
+    assert.equal(result.data.supabase_url, DEVELOP_URL);
+    assert.notEqual(result.data.project_ref, 'krcwpupbdizzjyydzaqp');
   });
 });
