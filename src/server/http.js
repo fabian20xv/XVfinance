@@ -6,7 +6,7 @@ import { createUserScopedClient } from '../chat/user-client.js';
 import { boot } from '../config/startup.js';
 import { isProductionEnv, resolveAppEnv, resolveCommitSha } from '../config/runtime-env.js';
 import { dispatchTool } from '../chat/tool-router.js';
-import { createOpenAIProvider, formatSse, runChatTurn } from '../ai/runtime/index.js';
+import { createOpenAIProvider, formatSse, isAiChatPath, runChatTurn } from '../ai/runtime/index.js';
 import { writeAuditEvent } from './audit.js';
 import { ApiError } from './errors.js';
 import { completeToolSuccess } from './tool-response.js';
@@ -311,7 +311,7 @@ export function createRequestListener({ env = process.env, deps = {} } = {}) {
         return;
       }
 
-      if (req.method === 'POST' && path === '/v1/chat') {
+      if (req.method === 'POST' && isAiChatPath(path)) {
         await runChatRequest(req, res, resolved);
         return;
       }

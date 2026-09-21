@@ -85,7 +85,7 @@ export async function postChat(options: {
   if (options.firmId) {
     headers['x-firm-id'] = options.firmId;
   }
-  const response = await fetch('/v1/chat', {
+  const response = await fetch('/v1/ai/chat', {
     method: 'POST',
     headers,
     cache: 'no-store',

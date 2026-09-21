@@ -41,7 +41,7 @@ export function Composer({
         <span style={{ fontSize: 11, color: 'var(--ink-muted)' }}>
           {pendingConfirm
             ? 'Confirm pending — composer stays unlocked. Writes wait on Confirm change.'
-            : 'POST /v1/chat · same E2 allowlist · composer unlocked while confirm pending'}
+            : 'POST /v1/ai/chat · same E2 allowlist · composer unlocked while confirm pending'}
         </span>
         <Button type="submit" variant="accent" disabled={busy || !value.trim()}>
           Send

@@ -1,5 +1,5 @@
 /**
- * Composer talks to POST /v1/chat (E11 agent turns). Slash/JSON still maps to
+ * Composer talks to POST /v1/ai/chat (E11 agent turns). Slash/JSON still maps to
  * the same E2 allowlist — the runtime short-circuits those without a second list.
  *
  * Accepted input:

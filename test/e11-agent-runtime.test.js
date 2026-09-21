@@ -8,10 +8,12 @@ import { listToolNames, openaiToolsFromAllowlist, TOOL_ALLOWLIST } from '../src/
 import { listToolNames as routerListToolNames, TOOL_ALLOWLIST as ROUTER_ALLOWLIST } from '../src/chat/tool-router.js';
 import {
   agentMayConfirm,
+  AI_CHAT_PATH,
   CHAT_EVENT_TYPES,
   createOpenAIProvider,
   extractProposalPayload,
   formatSse,
+  isAiChatPath,
   ModelUnavailableError,
   resolveOpenAIApiKey,
   runChatTurn,
@@ -81,6 +83,7 @@ describe('E11 agent chat runtime', () => {
       'src/ai/runtime/openai.js',
       'src/ai/runtime/events.js',
       'src/ai/runtime/timeouts.js',
+      'src/ai/runtime/route.js',
       'src/ai/tools/index.js',
       'src/ai/tools/adapters.js',
     ]) {
@@ -123,6 +126,7 @@ describe('E11 agent chat runtime', () => {
       'src/ai/runtime/openai.js',
       'src/ai/runtime/events.js',
       'src/ai/runtime/timeouts.js',
+      'src/ai/runtime/route.js',
       'src/ai/tools/index.js',
       'src/ai/tools/adapters.js',
     ];
@@ -384,7 +388,7 @@ describe('E11 agent chat runtime', () => {
     assert.equal(turn.error.code, 'model_unavailable');
   });
 
-  it('POST /v1/chat JSON slash tool uses the same dispatch as /v1/tools', async (t) => {
+  it('POST /v1/ai/chat JSON slash tool uses the same dispatch as /v1/tools', async (t) => {
     const token = await mint();
     const names = [];
     await withServer(
@@ -399,7 +403,7 @@ describe('E11 agent chat runtime', () => {
         },
       },
       async (port) => {
-        const res = await fetch(`http://127.0.0.1:${port}/v1/chat`, {
+        const res = await fetch(`http://127.0.0.1:${port}${AI_CHAT_PATH}`, {
           method: 'POST',
           headers: {
             authorization: `Bearer ${token}`,
@@ -417,7 +421,7 @@ describe('E11 agent chat runtime', () => {
     );
   });
 
-  it('POST /v1/chat streams SSE events', async (t) => {
+  it('POST /v1/ai/chat streams SSE events', async (t) => {
     const token = await mint();
     await withServer(
       t,
@@ -427,7 +431,7 @@ describe('E11 agent chat runtime', () => {
         },
       },
       async (port) => {
-        const res = await fetch(`http://127.0.0.1:${port}/v1/chat`, {
+        const res = await fetch(`http://127.0.0.1:${port}${AI_CHAT_PATH}`, {
           method: 'POST',
           headers: {
             authorization: `Bearer ${token}`,
@@ -447,10 +451,10 @@ describe('E11 agent chat runtime', () => {
     );
   });
 
-  it('POST /v1/chat degrades natural language without OPENAI_API_KEY', async (t) => {
+  it('POST /v1/ai/chat degrades natural language without OPENAI_API_KEY', async (t) => {
     const token = await mint();
     await withServer(t, {}, async (port) => {
-      const res = await fetch(`http://127.0.0.1:${port}/v1/chat`, {
+      const res = await fetch(`http://127.0.0.1:${port}${AI_CHAT_PATH}`, {
         method: 'POST',
         headers: {
           authorization: `Bearer ${token}`,
@@ -465,7 +469,11 @@ describe('E11 agent chat runtime', () => {
     });
   });
 
-  it('fetch adapter streams /v1/chat SSE', async () => {
+  it('fetch adapter streams /v1/ai/chat SSE; /v1/chat is an alias', async () => {
+    assert.equal(AI_CHAT_PATH, '/v1/ai/chat');
+    assert.equal(isAiChatPath('/v1/ai/chat'), true);
+    assert.equal(isAiChatPath('/v1/chat'), true);
+    assert.equal(isAiChatPath('/v1/tools'), false);
     const token = await mint();
     const handler = createFetchHandler({
       env: {
@@ -483,7 +491,7 @@ describe('E11 agent chat runtime', () => {
       },
     });
     const response = await handler(
-      new Request('http://127.0.0.1/v1/chat', {
+      new Request(`http://127.0.0.1${AI_CHAT_PATH}`, {
         method: 'POST',
         headers: {
           authorization: `Bearer ${token}`,
@@ -497,13 +505,28 @@ describe('E11 agent chat runtime', () => {
     assert.match(response.headers.get('content-type'), /text\/event-stream/);
     const text = await response.text();
     assert.match(text, /event: done/);
+
+    const alias = await handler(
+      new Request('http://127.0.0.1/v1/chat', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${token}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ message: '/health', stream: false }),
+      })
+    );
+    assert.equal(alias.status, 200);
+    const aliasBody = await alias.json();
+    assert.equal(aliasBody.ok, true);
   });
 
-  it('Dana composer is wired to POST /v1/chat and keeps confirm/scratchpad/receipts', () => {
+  it('Dana composer is wired to POST /v1/ai/chat and keeps confirm/scratchpad/receipts', () => {
     const shell = read('components/shell/AppShell.tsx');
     assert.match(shell, /postChat/);
     assert.match(shell, /hideConfirmCard=\{scratchpad\.open\}/);
-    assert.match(read('components/chat/Composer.tsx'), /\/v1\/chat/);
+    assert.match(read('lib/api.ts'), /\/v1\/ai\/chat/);
+    assert.match(read('components/chat/Composer.tsx'), /\/v1\/ai\/chat/);
     assert.match(read('components/chat/ConfirmCard.tsx'), /chat\.confirm_card/);
     assert.match(read('components/workspace/DiffConfirmPanel.tsx'), /workspace\.diff_confirm_panel/);
     assert.match(read('components/scratchpad/DraftVeil.tsx'), /source-of-truth="false"/);

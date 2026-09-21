@@ -7,5 +7,6 @@ export {
   resolveOpenAIApiKey,
   resolveOpenAIModel,
 } from './openai.js';
+export { AI_CHAT_PATH, AI_CHAT_PATH_ALIASES, isAiChatPath } from './route.js';
 export { abortAfter, DEFAULT_TIMEOUTS, withTimeout } from './timeouts.js';
 export { agentMayConfirm, runChatTurn } from './turn.js';

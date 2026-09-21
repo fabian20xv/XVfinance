@@ -1,5 +1,5 @@
 /**
- * Parse SSE blocks from POST /v1/chat (event: + data: JSON).
+ * Parse SSE blocks from POST /v1/ai/chat (event: + data: JSON).
  */
 
 /**

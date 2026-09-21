@@ -259,7 +259,7 @@ describe('E10 Dana v1.2 split-screen shell', () => {
     assert.equal(panel.includes('onMouseEnter'), false);
     const composer = read('components/chat/Composer.tsx');
     assert.match(composer, /unlocked-during-confirm/);
-    assert.match(composer, /\/v1\/chat/);
+    assert.match(composer, /\/v1\/ai\/chat/);
     const veil = read('components/scratchpad/DraftVeil.tsx');
     assert.match(veil, /source-of-truth="false"/);
     const header = read('components/workspace/WorkspaceHeader.tsx');
