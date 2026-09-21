@@ -76,9 +76,9 @@ Same listener (`createRequestListener` in `src/server/http.js`). Different proce
 
 | | Local | Vercel Preview / Production |
 | --- | --- | --- |
-| How it starts | `npm start` → `node src/index.js --serve` | Vercel invokes the Function at `api/index.js` (and `api/[...path].js` so `/api/health` is not a missing-file 404) |
+| How it starts | `npm start` → `node src/index.js --serve` | Next.js App Router (`app/`) plus the same listener via `app/api/*`, `app/v1/*`, and `api/index.js` |
 | Process | Long-lived `node:http` server, `PORT` default `8787` | One serverless invocation per request (Fluid Compute). No `node src/index.js --serve` |
-| Routing | `req.url` is the public path | `vercel.json` sends `/api/health`, `/api/smoke`, `/health`, and `/v1/*` to that Function. Non-`/api` paths are rewritten with `xv_path` so the listener still matches `/health` and `/v1/*` |
+| Routing | `req.url` is the public path | `vercel.json` sends `/api/health`, `/api/smoke`, `/health`, and `/v1/*` to the same listener (`xv_path` for `/health` and `/v1/*`). `/` is the E10 Dana shell — there is no catch-all rewrite |
 | Allowlist | `boot()` on process start | `boot()` on Function init (same `SUPABASE_URL` allowlist; develop ref refused when `VERCEL_ENV`/`APP_ENV` is production) |
 
 Do not run `--serve` on Vercel. Preview/staging `SUPABASE_URL` must be develop only (`bkwhqfkosxnoffpsjcug`). Never parent `krcwpupbdizzjyydzaqp` on Preview.
@@ -220,12 +220,29 @@ Ghostwrite writes a **draft** meeting 1-pager (via `reports` with `purpose = mee
 | CA-9.2 | Receipts panel `ui: workspace.receipts_panel` (`get_meeting_receipts`); each receipt is firm-scoped and auditable |
 | CA-9.3 | `propose_meeting_send` (manager confirm, channel `email` \| `export`) + `export_meeting_one_pager` (audited; `public_url` always null) |
 
+## Split-screen shell (E10, Dana v1.2)
+
+Next.js App Router UI at `app/` (same repo as the Node `/v1` server). Design pack v1.2 (Rio sharpen) is copy/motion on the v1.1 inventory: Inter + system-ui, accent `#0F6E6A`, 56/44 split (drag 48–64, reset → 56), 48px top bar, no nav rail, 8px grid, 10px radius. Composer stays unlocked while confirm is pending.
+
+| Surface | Wiring |
+| --- | --- |
+| AuthGate | Supabase Auth session only; user JWT is sent as `Authorization: Bearer` to `/v1` |
+| Confirm pulse | ConfirmCard + DiffConfirmPanel share `proposal_id`. Select/focus (never hover) inhales both borders once (600ms ease-out). Primary **Confirm change**; secondary **Dismiss proposal**. Success: **Confirmed · {time} · you**, then fade ~1.2s. `POST /v1/proposals/:id/confirm` / `reject` |
+| Scratchpad | Veil over the right pane only (not a tab). Diagonal **DRAFT · what-if** at 8–12%. Subline: **Won’t change positions until you confirm.** `GET /v1/scratchpads/:id/impact`. Promote → `scratchpad_promote` manager dual-confirm. ConfirmCard is absent while the veil is open. Success dissolves upward; fail keeps the watermark and toasts **Not applied — still draft.** Discard dissolves in 200ms with no source-of-truth persist |
+| Receipts | Marks **[1]** (not “citation”). Side-slip popover beside the mark (120–160ms fade + 2px rise). Title is source type + relative time; one factual body line; **Open in workspace** only when `path` is present. Missing/RLS → dashed **[?]** **Not available for this account**. `public_url` is always `null`. Email/Export → `propose_meeting_send` |
+| Composer | Stays unlocked while confirm is pending. Dispatches allowlisted `POST /v1/tools` (no invented model chat API) |
+| SpeakReadyToggle | Deferred to epic 1.5 (file kept, not mounted) |
+
+Out of scope: CRM, optimizer, news firehose, scenario libraries, dark mode.
+
+Preview/dev web env may use develop ref `bkwhqfkosxnoffpsjcug`. Production must use parent `krcwpupbdizzjyydzaqp`.
+
 ## Setup
 
 ```bash
 cp .env.example .env   # placeholders only; never commit real keys
 npm install
-npm run ci             # lock assert + lint + tests (E0–E9)
+npm run ci             # lock assert + lint + tests (E0–E10)
 # Server-only, locked project only (requires real SUPABASE_SERVICE_ROLE_KEY):
 npm run seed                    # parent/prod smoke fixture only
 npm run seed:tess -- --dry-run  # develop URL guard; no writes
@@ -235,9 +252,23 @@ npm run smoke:e5e8
 npm run smoke:e9
 ```
 
-Start (requires `SUPABASE_URL` in the environment). Without `--serve` the process only runs `boot()` and exits. `npm start` adds `--serve`:
+Start the Node `/v1` API (requires `SUPABASE_URL` in the environment). Without `--serve` the process only runs `boot()` and exits. `npm start` adds `--serve`:
 
 ```bash
 node --env-file=.env src/index.js --serve
 # or: npm start
 ```
+
+The API still listens on `PORT` (default `8787`). It is unchanged: health, smoke, `/v1/session`, `/v1/tools`, proposals, scratchpad impact, meeting receipts.
+
+Start the E10 web shell (App Router). Next.js also serves `/v1`, `/health`, `/api/health`, and `/api/smoke` through the same `createRequestListener`, so `npm run web` is enough for local UI + API. Keep `npm start` when you want the Node listener alone:
+
+```bash
+# Web + API in one Next.js process (http://127.0.0.1:3000)
+npm run web
+
+# Optional: Node API only (http://127.0.0.1:8787)
+npm start
+```
+
+Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (same allowlisted projects as `SUPABASE_URL`). AuthGate signs in with Supabase Auth, then calls `GET /v1/session` with the user JWT.

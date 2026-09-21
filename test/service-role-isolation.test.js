@@ -16,7 +16,8 @@ import { createServiceRoleClient, getServiceRoleKey } from '../src/server/servic
 
 const LOCKED_URL = 'https://krcwpupbdizzjyydzaqp.supabase.co';
 const ROOT = join(import.meta.dirname, '..');
-const SCAN_DIRS = ['src/chat', 'src/client'];
+const SCAN_DIRS = ['src/chat', 'src/client', 'src/web', 'app', 'components', 'lib'];
+const SCAN_EXT = ['.js', '.ts', '.tsx', '.mjs'];
 const FORBIDDEN_IN_CHAT_CLIENT = [
   'SUPABASE_SERVICE_ROLE_KEY',
   'SUPABASE_SECRET_KEY',
@@ -25,11 +26,17 @@ const FORBIDDEN_IN_CHAT_CLIENT = [
 ];
 
 function walk(dir, files = []) {
-  for (const entry of readdirSync(dir)) {
+  let entries;
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return files;
+  }
+  for (const entry of entries) {
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) {
       walk(full, files);
-    } else if (full.endsWith('.js')) {
+    } else if (SCAN_EXT.some((ext) => full.endsWith(ext))) {
       files.push(full);
     }
   }

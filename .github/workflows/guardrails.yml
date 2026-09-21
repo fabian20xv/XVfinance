@@ -24,3 +24,9 @@ jobs:
         run: npm run lint
       - name: Tests
         run: npm test
+      - name: Next.js web build
+        run: npm run web:build
+        env:
+          SUPABASE_URL: https://krcwpupbdizzjyydzaqp.supabase.co
+          NEXT_PUBLIC_SUPABASE_URL: https://krcwpupbdizzjyydzaqp.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: build-placeholder-anon-key
