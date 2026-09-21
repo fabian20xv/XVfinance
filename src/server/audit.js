@@ -1,6 +1,7 @@
 /**
  * Firm-scoped audit writer. Server-only (service-role); never imported from chat tools.
  */
+import { asAuditEntityId } from '../audit/entity-id.js';
 import { createServiceRoleClient } from './service-role.js';
 import { badRequest } from './errors.js';
 
@@ -61,7 +62,7 @@ export async function writeAuditEvent({
       actor_id: actorId ?? null,
       action,
       entity_table: entityTable ?? null,
-      entity_id: entityId ?? null,
+      entity_id: asAuditEntityId(entityId),
       payload: redactAuditPayload(payload ?? {}),
     })
     .select('id')

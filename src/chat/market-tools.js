@@ -1,5 +1,6 @@
 /**
  * CA-7.2 market read tools (equities-first). User JWT + allowlist; stub if no live key.
+ * Audit entity_id is uuid — never the ticker string (BUG-B10).
  */
 import { createMarketProvider } from '../market/provider.js';
 import { badArgs } from './tool-error.js';
@@ -25,10 +26,10 @@ export const MARKET_TOOLS = {
       required: ['symbol'],
       properties: { symbol: { type: 'string' } },
     },
-    audit: ({ args }) => ({
+    audit: () => ({
       action: 'market.quote',
       entityTable: 'instruments',
-      entityId: args.symbol,
+      entityId: null,
       sensitive: false,
     }),
     async handler({ args, env }) {
@@ -43,10 +44,10 @@ export const MARKET_TOOLS = {
       required: ['symbol'],
       properties: { symbol: { type: 'string' } },
     },
-    audit: ({ args }) => ({
+    audit: () => ({
       action: 'market.fundamentals',
       entityTable: 'instruments',
-      entityId: args.symbol,
+      entityId: null,
       sensitive: false,
     }),
     async handler({ args, env }) {
@@ -64,10 +65,10 @@ export const MARKET_TOOLS = {
         limit: { type: 'integer', minimum: 1, maximum: 25 },
       },
     },
-    audit: ({ args }) => ({
+    audit: () => ({
       action: 'market.news',
       entityTable: 'instruments',
-      entityId: args.symbol,
+      entityId: null,
       sensitive: false,
     }),
     async handler({ args, env }) {

@@ -660,6 +660,48 @@ describe('CA-2 HTTP API', () => {
     );
   });
 
+  it('POST /v1/tools market reads never audit a ticker as entityId', async (t) => {
+    const audits = [];
+    const token = await mint();
+    await withServer(
+      t,
+      {
+        deps: {
+          ...sessionDeps,
+          writeAudit: async (event) => {
+            audits.push(event);
+            return 'audit-market';
+          },
+        },
+      },
+      async (port) => {
+        for (const name of ['get_quote', 'get_fundamentals', 'get_news_headlines']) {
+          const res = await fetch(`http://127.0.0.1:${port}/v1/tools`, {
+            method: 'POST',
+            headers: {
+              authorization: `Bearer ${token}`,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({ name, args: { symbol: 'SPY' } }),
+          });
+          const body = await res.json();
+          assert.equal(res.status, 200, `${name} ${body.error?.message ?? ''}`);
+          assert.equal(body.ok, true);
+        }
+        assert.equal(audits.length, 3);
+        for (const event of audits) {
+          assert.notEqual(event.entityId, 'SPY');
+          if (event.entityId != null) {
+            assert.match(
+              String(event.entityId),
+              /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+            );
+          }
+        }
+      }
+    );
+  });
+
   it('POST /v1/imports/holdings maps unmatched_symbols to 409', async (t) => {
     const token = await mint();
     await withServer(
