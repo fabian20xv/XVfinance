@@ -44,13 +44,13 @@ export function MeetingOnePager({
   const pagerClass = enlarged ? 'meeting-one-pager meeting-one-pager--speak' : 'meeting-one-pager';
   if (!report) {
     return (
-      <div className={pagerClass} data-meeting-one-pager="true" data-speak-ready={enlarged ? 'true' : 'false'}>
+      <article className={pagerClass} data-meeting-one-pager="true" data-speak-ready={enlarged ? 'true' : 'false'}>
         <DashedEmptySlot
           label={missing ? RECEIPT_NO_LAST_MEETING : 'No meeting 1-pager loaded'}
           hint={missing ? undefined : RECEIPT_NO_LAST_MEETING}
           question
         />
-      </div>
+      </article>
     );
   }
   const sections = Array.isArray(report.sections) ? report.sections : [];
