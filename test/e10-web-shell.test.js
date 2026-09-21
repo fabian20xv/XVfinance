@@ -253,7 +253,8 @@ describe('E10 Dana v1.2 split-screen shell', () => {
     }
     const card = read('components/chat/ConfirmCard.tsx');
     assert.match(card, /chat\.confirm_card/);
-    assert.match(card, /proposal_id/);
+    assert.match(card, /data-proposal-id/);
+    assert.match(card, /data-confirm-twin="true"/);
     assert.match(card, /confirm-pulse/);
     assert.equal(card.includes('onMouseEnter'), false);
     assert.equal(card.includes('onHover'), false);
@@ -265,19 +266,25 @@ describe('E10 Dana v1.2 split-screen shell', () => {
     assert.match(actions, /confirmedLine/);
     const panel = read('components/workspace/DiffConfirmPanel.tsx');
     assert.match(panel, /workspace\.diff_confirm_panel/);
+    assert.match(panel, /data-confirm-twin="true"/);
     assert.match(panel, /confirm-pulse/);
     assert.equal(panel.includes('onMouseEnter'), false);
+    assert.equal(panel.includes('onHover'), false);
     const composer = read('components/chat/Composer.tsx');
     assert.match(composer, /unlocked-during-confirm/);
+    assert.match(composer, /Ask about a portfolio, client, or meeting/);
     assert.match(composer, /Enter to send/);
     assert.match(composer, /Shift\+Enter/);
     assert.equal(composer.includes('/v1/ai/chat'), false);
+    assert.equal(composer.includes('POST /v1'), false);
     assert.equal(composer.includes('/v1/tools'), false);
     assert.equal(composer.includes('/get_session_context'), false);
+    assert.equal(composer.includes('metaKey'), false);
     const thread = read('components/chat/ChatThread.tsx');
     assert.match(thread, /'You'/);
     assert.match(thread, /'XV'/);
     assert.match(thread, /stream-caret/);
+    assert.match(thread, /!message\.text\.trim\(\)/);
     assert.match(thread, /scrollHeight/);
     assert.equal(thread.includes("role: 'tool'"), false);
     assert.equal(thread.includes('{message.role}'), false);

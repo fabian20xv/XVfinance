@@ -75,11 +75,12 @@ export function ChatThread({
         {messages.length === 0 ? (
           <DashedEmptySlot
             label="No thread yet"
-            hint="Ask about this book, a holding, or a client. Proposed changes wait for your confirm."
+            hint="Ask about a portfolio, client, or meeting. Proposed changes wait for your confirm."
           />
         ) : (
           messages.map((message) => {
-            const streaming = message.role === 'assistant' && Boolean(busy) && !message.confirmCard;
+            const showCaret =
+              message.role === 'assistant' && Boolean(busy) && !message.text.trim();
             return (
               <div key={message.id} style={{ display: 'grid', gap: 8 }}>
                 <div
@@ -98,10 +99,10 @@ export function ChatThread({
                     <strong style={{ fontSize: 11, color: 'var(--ink-muted)' }}>{bubbleLabel(message.role)}</strong>
                   </div>
                   {message.text}
-                  {streaming ? <span className="stream-caret" aria-hidden="true" /> : null}
+                  {showCaret ? <span className="stream-caret" aria-hidden="true" /> : null}
                   {message.role === 'assistant' && message.tools?.length ? (
                     <div
-                      style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: message.text || streaming ? 8 : 0 }}
+                      style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: message.text || showCaret ? 8 : 0 }}
                     >
                       {message.tools.map((tool) => (
                         <ToolStatusPill

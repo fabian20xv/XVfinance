@@ -410,6 +410,7 @@ describe('E11 src/ai isolation', () => {
     const composer = readFileSync(join(ROOT, 'components/chat/Composer.tsx'), 'utf8');
     assert.equal(composer.includes('/v1/ai/chat'), false);
     assert.equal(composer.includes('/v1/tools'), false);
+    assert.match(composer, /Ask about a portfolio, client, or meeting/);
     assert.match(composer, /Enter to send/);
     const shell = readFileSync(join(ROOT, 'components/shell/AppShell.tsx'), 'utf8');
     assert.match(shell, /streamChatTurn/);

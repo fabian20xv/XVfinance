@@ -32,7 +32,7 @@ export function Composer({
       <textarea
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        placeholder="Ask about this book, a holding, or a proposed change…"
+        placeholder="Ask about a portfolio, client, or meeting…"
         disabled={false}
         aria-disabled={false}
         data-unlocked-during-confirm={pendingConfirm ? 'true' : 'false'}
