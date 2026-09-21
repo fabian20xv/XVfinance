@@ -2,7 +2,7 @@
 
 import { Badge } from '@/components/primitives/Badge';
 import { ConfirmActions, type ConfirmOutcome } from '@/components/chat/ConfirmActions';
-import { actionPath, confirmCardFields } from '@/src/web/dual-confirm.js';
+import { actionPath, confirmCardFields, resolveTwinOutcome } from '@/src/web/dual-confirm.js';
 
 export type ConfirmCardModel = {
   ui?: string;
@@ -49,6 +49,8 @@ export function ConfirmCard({
   canConfirm,
   busy,
   outcome,
+  actionError,
+  canReject = true,
   onSelect,
   onConfirm,
   onReject,
@@ -57,7 +59,9 @@ export function ConfirmCard({
   highlighted?: boolean;
   canConfirm: boolean;
   busy?: boolean;
-  outcome?: ConfirmOutcome;
+  outcome?: ConfirmOutcome | null;
+  actionError?: { proposalId: string; message: string } | null;
+  canReject?: boolean;
   onSelect?: (proposalId: string) => void;
   onConfirm: (proposalId: string, path: string, method: string) => void;
   onReject: (proposalId: string, path: string, method: string) => void;
@@ -70,10 +74,12 @@ export function ConfirmCard({
   const confirm = actionPath(fields.actions, 'confirm');
   const reject = actionPath(fields.actions, 'reject');
   const pending = fields.status === 'pending' || fields.status === 'pending_confirm';
-  const confirmed = outcome?.status === 'confirmed' && outcome.proposalId === proposalId;
+  const resolved = resolveTwinOutcome(outcome, proposalId, fields.status);
+  const terminal = resolved?.status === 'confirmed' || resolved?.status === 'rejected';
   const select = () => onSelect?.(proposalId);
   const role = roleLabel(fields.requires_role);
   const expires = expiresLabel(fields.expires_at);
+  const error = actionError?.proposalId === proposalId ? actionError.message : null;
 
   return (
     <article
@@ -104,12 +110,15 @@ export function ConfirmCard({
         <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-muted)' }}>Expires {expires}</p>
       ) : null}
       <ConfirmActions
-        pending={pending}
+        pending={pending && !terminal}
         canConfirm={canConfirm}
+        canReject={canReject}
         busy={busy}
         confirm={confirm}
         reject={reject}
-        outcome={confirmed ? outcome : null}
+        outcome={terminal ? resolved : null}
+        error={error}
+        persistTerminal
         onSelect={select}
         onConfirm={(path, method) => onConfirm(proposalId, path, method)}
         onReject={(path, method) => onReject(proposalId, path, method)}

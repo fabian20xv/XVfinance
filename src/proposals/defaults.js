@@ -86,3 +86,11 @@ export function roleCanConfirm(role, requiresRole) {
   }
   return role === 'manager' || role === 'analyst';
 }
+
+/**
+ * Any firm member may dismiss/reject. Confirm/apply stay on roleCanConfirm.
+ * @param {string} role
+ */
+export function roleCanReject(role) {
+  return role === 'manager' || role === 'analyst';
+}

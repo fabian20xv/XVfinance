@@ -226,6 +226,18 @@ describe('CA-4 proposal pipeline + dual confirm', () => {
     assert.equal(result.error.code, 'forbidden');
   });
 
+  it('lets an analyst reject a manager-gated pending proposal without applying', async () => {
+    const { result } = await run(
+      'reject_proposal',
+      { proposal_id: SMOKE_PROPOSAL_ID },
+      { session: analyst }
+    );
+    assert.equal(result.ok, true);
+    assert.equal(result.data.status, 'rejected');
+    assert.equal(result.data.rejected_by, SMOKE_ANALYST_ID);
+    assert.equal(result.audit.action, 'proposal.rejected');
+  });
+
   it('lets a manager confirm a holding proposal (apply is the confirm UPDATE)', async () => {
     const { result } = await run('confirm_proposal', { proposal_id: SMOKE_PROPOSAL_ID });
     assert.equal(result.ok, true);

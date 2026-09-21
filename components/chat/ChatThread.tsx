@@ -6,6 +6,7 @@ import type { ConfirmOutcome } from '@/components/chat/ConfirmActions';
 import { Composer } from '@/components/chat/Composer';
 import { ToolStatusPill } from '@/components/chat/ToolStatusPill';
 import { DashedEmptySlot } from '@/components/workspace/DashedEmptySlot';
+import { twinOutcome } from '@/src/web/dual-confirm.js';
 
 export type ChatToolEvent = {
   id?: string;
@@ -36,7 +37,9 @@ export function ChatThread({
   canConfirm,
   hideConfirmCard,
   pendingCard,
-  outcome,
+  outcomes,
+  actionError,
+  canReject = true,
   onSelectProposal,
   onConfirm,
   onReject,
@@ -51,7 +54,9 @@ export function ChatThread({
   canConfirm: boolean;
   hideConfirmCard?: boolean;
   pendingCard?: ConfirmCardModel | null;
-  outcome?: ConfirmOutcome;
+  outcomes?: Record<string, ConfirmOutcome>;
+  actionError?: { proposalId: string; message: string } | null;
+  canReject?: boolean;
   onSelectProposal: (proposalId: string) => void;
   onConfirm: (proposalId: string, path: string, method: string) => void;
   onReject: (proposalId: string, path: string, method: string) => void;
@@ -119,8 +124,10 @@ export function ChatThread({
                     card={message.confirmCard}
                     highlighted={highlightedProposalId === message.confirmCard.proposal_id}
                     canConfirm={canConfirm}
+                    canReject={canReject}
                     busy={busy}
-                    outcome={outcome}
+                    outcome={twinOutcome(outcomes, message.confirmCard.proposal_id)}
+                    actionError={actionError}
                     onSelect={onSelectProposal}
                     onConfirm={onConfirm}
                     onReject={onReject}
@@ -137,8 +144,10 @@ export function ChatThread({
             card={pendingCard}
             highlighted={highlightedProposalId === pendingCard.proposal_id}
             canConfirm={canConfirm}
+            canReject={canReject}
             busy={busy}
-            outcome={outcome}
+            outcome={twinOutcome(outcomes, pendingCard.proposal_id)}
+            actionError={actionError}
             onSelect={onSelectProposal}
             onConfirm={onConfirm}
             onReject={onReject}

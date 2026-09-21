@@ -104,7 +104,7 @@ If develop is behind main, **schema migrations must be applied to develop** befo
 
 ## Schema + RLS (E1)
 
-E1–E9 schema migrations live in `supabase/migrations/` and stay pinned to https://krcwpupbdizzjyydzaqp.supabase.co. Exception: `20260920210000_proposal_lifecycle_audit.sql` may also be applied to develop https://bkwhqfkosxnoffpsjcug.supabase.co (Tess Preview). Refuse any third project. Do not `supabase link` or seed a non-allowlisted project.
+E1–E9 schema migrations live in `supabase/migrations/` and stay pinned to https://krcwpupbdizzjyydzaqp.supabase.co. Exception: dual-allowlist files (`20260920210000_proposal_lifecycle_audit.sql`, `20260921100000_meeting_send_apply.sql`, `20260921140000_analyst_reject_manager_gated.sql`) may also be applied to develop https://bkwhqfkosxnoffpsjcug.supabase.co (Tess Preview). Refuse any third project. Do not `supabase link` or seed a non-allowlisted project.
 
 | Ticket | What shipped |
 | --- | --- |
@@ -162,12 +162,12 @@ Chat tools run through the E2 allowlist router with a **user-JWT** Supabase clie
 
 ## Proposal pipeline + dual confirm (E4)
 
-Mutations to clients/contacts/holdings/notes/watchlists stay blocked for `authenticated`. Members insert `pending_confirm` proposals; confirm/reject is role-gated. A `BEFORE UPDATE` trigger on `proposals` applies the payload **in the same transaction as the confirming user** (`auth.uid()`), writing domain rows from a `private` security-definer function.
+Mutations to clients/contacts/holdings/notes/watchlists stay blocked for `authenticated`. Members insert `pending_confirm` proposals; **confirm/apply** is role-gated (`requires_role`), while **any firm member may dismiss/reject**. A `BEFORE UPDATE` trigger on `proposals` applies the payload **in the same transaction as the confirming user** (`auth.uid()`), writing domain rows from a `private` security-definer function. Reject does not apply.
 
 | Ticket | What shipped |
 | --- | --- |
 | CA-4.1 | Proposals API: `pending` / `confirmed` / `rejected` / `expired` (+ `preview`, `expires_at`, `idempotency_key`) |
-| CA-4.2 | `confirm_proposal` / `reject_proposal` with `requires_role` (`any_member` \| `manager`); apply as confirmer. Lifecycle `audit_events` (`proposal.applied` / `proposal.rejected` / …) are inserted in the same transaction as the status/apply; audit insert failure rolls back the mutate. `20260920210000_proposal_lifecycle_audit.sql` may be applied to **both** E0 refs (develop `bkwhqfkosxnoffpsjcug` for Preview/Tess, parent `krcwpupbdizzjyydzaqp` for prod). Refuse any third project. |
+| CA-4.2 | `confirm_proposal` stays `requires_role` (`any_member` \| `manager`) and apply-as-confirmer. `reject_proposal` / Dismiss is allowed for any firm member (analyst may dismiss a manager-gated pending proposal; confirm/apply stay manager-only). Lifecycle `audit_events` (`proposal.applied` / `proposal.rejected` / …) are inserted in the same transaction as the status/apply; audit insert failure rolls back the mutate. Dual-allowlist SQL (`20260920210000_proposal_lifecycle_audit.sql`, `20260921100000_meeting_send_apply.sql`, `20260921140000_analyst_reject_manager_gated.sql`) may be applied to **both** E0 refs (develop `bkwhqfkosxnoffpsjcug` for Preview/Tess, parent `krcwpupbdizzjyydzaqp` for prod). Refuse any third project. |
 | CA-4.3 | Chat confirm card contract `ui: chat.confirm_card` |
 | CA-4.4 | Workspace diff/confirm panel `ui: workspace.diff_confirm_panel` — **same `proposal_id`** |
 | CA-4.5 | `propose_holding_changes`, `propose_client_upsert`, `propose_contact_upsert` |

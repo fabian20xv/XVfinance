@@ -131,6 +131,17 @@ body {
   animation: confirm-success-fade var(--success-fade-ms) ease-out 1 forwards;
 }
 
+.confirm-terminal-line {
+  margin: 0;
+  font-size: 13px;
+  color: var(--success);
+}
+
+.confirm-terminal-line[data-dismissed='true'],
+.confirm-success-line[data-dismissed='true'] {
+  color: var(--ink-muted);
+}
+
 @keyframes confirm-success-fade {
   0%,
   55% {
