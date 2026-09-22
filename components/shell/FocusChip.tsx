@@ -23,7 +23,7 @@ export function FocusChip({
 }) {
   if (clients.length === 0 && !clientId) {
     return (
-      <div style={{ minWidth: 220 }}>
+      <div className="speak-ready-dim" style={{ minWidth: 220 }}>
         <DashedEmptySlot label="No client/portfolio focus" hint="list_clients returned none for this firm." />
       </div>
     );
@@ -32,7 +32,7 @@ export function FocusChip({
     ? portfolios.filter((row) => !row.client_id || row.client_id === clientId)
     : portfolios;
   return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+    <div className="speak-ready-dim" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
       {entityLabel ? (
         <button
           type="button"

@@ -39,6 +39,9 @@
   --receipt-slip-ms: 140ms;
   --amber-pulse-ms: 500ms;
   --confirmed-delta-ms: 800ms;
+  --speak-body-size: 18px;
+  --speak-body-line: 28px;
+  --speak-chrome-opacity: 0.4;
 }
 
 html,
@@ -607,6 +610,37 @@ body {
 
 .composer textarea:disabled {
   opacity: 0.45;
+}
+
+.app-root.is-speak-ready .speak-ready-dim {
+  color: var(--ink-muted);
+  opacity: var(--speak-chrome-opacity);
+}
+
+.app-root.is-speak-ready .speak-ready-dim:focus-within,
+.app-root.is-speak-ready .speak-ready-toggle {
+  opacity: 1;
+}
+
+.app-root.is-speak-ready .meeting-one-pager--speak {
+  font-size: var(--speak-body-size);
+  line-height: var(--speak-body-line);
+}
+
+.app-root.is-speak-ready .meeting-one-pager--speak h2 {
+  font-size: 22px;
+  line-height: 28px;
+  letter-spacing: -0.01em;
+}
+
+.app-root.is-speak-ready .meeting-one-pager--speak h3 {
+  font-size: 12px;
+}
+
+.app-root.is-speak-ready .meeting-one-pager--speak p,
+.app-root.is-speak-ready .meeting-one-pager--speak .section-body {
+  font-size: var(--speak-body-size);
+  line-height: var(--speak-body-line);
 }
 
 .stream-caret {

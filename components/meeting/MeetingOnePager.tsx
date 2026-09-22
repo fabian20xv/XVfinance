@@ -21,27 +21,56 @@ export type MeetingReport = {
 export function MeetingOnePager({
   report,
   missing = false,
+  enlarged = false,
+  openIndex: openIndexProp,
+  onOpenIndexChange,
 }: {
   report: MeetingReport | null;
   missing?: boolean;
+  enlarged?: boolean;
+  openIndex?: number | null;
+  onOpenIndexChange?: (index: number | null) => void;
 }) {
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState<number | null>(null);
+  const controlled = Boolean(onOpenIndexChange);
+  const openIndex = controlled ? (openIndexProp ?? null) : uncontrolledOpen;
+  const setOpenIndex = (index: number | null) => {
+    if (onOpenIndexChange) {
+      onOpenIndexChange(index);
+      return;
+    }
+    setUncontrolledOpen(index);
+  };
+  const pagerClass = enlarged ? 'meeting-one-pager meeting-one-pager--speak' : 'meeting-one-pager';
   if (!report) {
     return (
-      <DashedEmptySlot
-        label={missing ? RECEIPT_NO_LAST_MEETING : 'No meeting 1-pager loaded'}
-        hint={missing ? undefined : RECEIPT_NO_LAST_MEETING}
-        question
-      />
+      <article className={pagerClass} data-meeting-one-pager="true" data-speak-ready={enlarged ? 'true' : 'false'}>
+        <DashedEmptySlot
+          label={missing ? RECEIPT_NO_LAST_MEETING : 'No meeting 1-pager loaded'}
+          hint={missing ? undefined : RECEIPT_NO_LAST_MEETING}
+          question
+        />
+      </article>
     );
   }
   const sections = Array.isArray(report.sections) ? report.sections : [];
   const receipts = ((withNullPublicUrl({ receipts: report.receipts ?? [] }) as { receipts?: Receipt[] }).receipts ??
     []) as Receipt[];
+  const bodyStyle = enlarged
+    ? { margin: 0, whiteSpace: 'pre-wrap' as const }
+    : { margin: 0, fontSize: 13, whiteSpace: 'pre-wrap' as const };
+  const bodyClass = enlarged ? 'section-body' : undefined;
   return (
-    <article data-public-url="null" data-meeting-one-pager="true" style={{ display: 'grid', gap: 12 }}>
+    <article
+      data-public-url="null"
+      data-meeting-one-pager="true"
+      data-speak-ready={enlarged ? 'true' : 'false'}
+      data-speak-body={enlarged ? '18/28' : undefined}
+      className={pagerClass}
+      style={{ display: 'grid', gap: enlarged ? 20 : 12 }}
+    >
       <header style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <h2 style={{ margin: 0, fontSize: 16 }}>{report.title ?? 'Meeting 1-pager'}</h2>
+        <h2 style={enlarged ? { margin: 0 } : { margin: 0, fontSize: 16 }}>{report.title ?? 'Meeting 1-pager'}</h2>
         <Badge>{report.status ?? 'draft'}</Badge>
       </header>
       {sections.length > 0
@@ -50,7 +79,7 @@ export function MeetingOnePager({
               <h3
                 style={{
                   margin: '0 0 10px',
-                  fontSize: 11,
+                  ...(enlarged ? {} : { fontSize: 11 }),
                   letterSpacing: '0.05em',
                   textTransform: 'uppercase',
                   color: 'var(--ink-muted)',
@@ -59,7 +88,7 @@ export function MeetingOnePager({
               >
                 {section.heading}
               </h3>
-              <p style={{ margin: 0, fontSize: 13, whiteSpace: 'pre-wrap' }}>
+              <p className={bodyClass} style={bodyStyle}>
                 <TextWithReceiptMarks
                   text={section.body ?? ''}
                   receipts={receipts}
@@ -71,7 +100,7 @@ export function MeetingOnePager({
             </section>
           ))
         : (
-          <p style={{ margin: 0, fontSize: 13, whiteSpace: 'pre-wrap' }}>
+          <p className={bodyClass} style={bodyStyle}>
             <TextWithReceiptMarks
               text={report.body ?? ''}
               receipts={receipts}

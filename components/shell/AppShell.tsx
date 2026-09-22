@@ -14,6 +14,7 @@ import { Toast, type ToastItem } from '@/components/primitives/Toast';
 import { DraftVeil } from '@/components/scratchpad/DraftVeil';
 import { FirmContextBar } from '@/components/shell/FirmContextBar';
 import { FocusChip } from '@/components/shell/FocusChip';
+import { SpeakReadyToggle } from '@/components/shell/SpeakReadyToggle';
 import { DiffConfirmPanel, type DiffPanelModel } from '@/components/workspace/DiffConfirmPanel';
 import { EmptyWorkspace } from '@/components/workspace/EmptyWorkspace';
 import { HoldingsTable, type CashStrip, type HoldingRow } from '@/components/workspace/HoldingsTable';
@@ -35,6 +36,7 @@ import { discardedScratchpadState, SCRATCHPAD_FAIL_TOAST } from '@/src/web/scrat
 import { clampChatPct, resetChatPct } from '@/src/web/split.js';
 import { scrollDiffPanelIfClipped } from '@/src/web/confirm-ui.js';
 import { focusEntityLabel } from '@/src/web/receipt-ui.js';
+import { SPEAK_EMPTY_RECEIPTS, resolveSpeakReady, speakReceiptShortcut } from '@/src/web/speak-ready.js';
 import { roleCanConfirm, roleCanReject } from '@/src/proposals/defaults.js';
 
 type SessionPayload = { user_id: string; firm_id: string; role: 'manager' | 'analyst' };
@@ -79,6 +81,8 @@ export function AppShell({
   const [meeting, setMeeting] = useState<MeetingReport | null>(null);
   const [workspaceMode, setWorkspaceMode] = useState<'live' | 'meeting' | 'report'>('live');
   const [meetingMissing, setMeetingMissing] = useState(false);
+  const [speakReady, setSpeakReady] = useState(false);
+  const [receiptOpenIndex, setReceiptOpenIndex] = useState<number | null>(null);
   const [pendingCard, setPendingCard] = useState<ConfirmCardModel | null>(null);
   const [pendingPanel, setPendingPanel] = useState<DiffPanelModel | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -93,6 +97,7 @@ export function AppShell({
   const [asOf, setAsOf] = useState<string | null>(null);
   const drag = useRef<{ startX: number; startPct: number } | null>(null);
   const sendingRef = useRef(false);
+  const emptyReceiptToast = useRef(false);
 
   const firmId = apiSession?.firm_id ?? null;
 
@@ -228,6 +233,63 @@ export function AppShell({
     // Re-run when the JWT changes; avoid looping on firmId state.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- bootstrap identity tracks firmId
   }, [token]);
+
+  const meetingOpen = workspaceMode === 'meeting';
+  const [speakGate, setSpeakGate] = useState(meetingOpen);
+  if (meetingOpen !== speakGate) {
+    setSpeakGate(meetingOpen);
+    if (!meetingOpen) {
+      emptyReceiptToast.current = false;
+      setSpeakReady(false);
+      setReceiptOpenIndex(null);
+    }
+  }
+  const speakLive = resolveSpeakReady(speakReady, workspaceMode);
+  const receiptCount = Array.isArray(meeting?.receipts) ? meeting.receipts.length : 0;
+
+  useEffect(() => {
+    if (!speakLive) {
+      return undefined;
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      const action = speakReceiptShortcut(event, {
+        speakReady: true,
+        receiptCount,
+        openIndex: receiptOpenIndex,
+      });
+      if (action.type === 'ignore') {
+        return;
+      }
+      event.preventDefault();
+      if (action.type === 'empty') {
+        if (!emptyReceiptToast.current) {
+          emptyReceiptToast.current = true;
+          toast(SPEAK_EMPTY_RECEIPTS);
+        }
+        return;
+      }
+      setReceiptOpenIndex(action.index);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [speakLive, receiptCount, receiptOpenIndex, toast]);
+
+  const onSpeakReadyChange = (next: boolean) => {
+    if (!next || workspaceMode !== 'meeting') {
+      emptyReceiptToast.current = false;
+      setSpeakReady(false);
+      setReceiptOpenIndex(null);
+      return;
+    }
+    setSpeakReady(true);
+  };
+
+  const leaveMeeting = () => {
+    emptyReceiptToast.current = false;
+    setSpeakReady(false);
+    setReceiptOpenIndex(null);
+    setWorkspaceMode('live');
+  };
 
   const onFocusChange = async (next: { client_id: string | null; portfolio_id: string | null }) => {
     const result = await runTool('set_workspace_focus', {
@@ -628,7 +690,11 @@ export function AppShell({
   ) : null;
 
   return (
-    <div className="app-root" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div
+      className={speakLive ? 'app-root is-speak-ready' : 'app-root'}
+      data-speak-ready={speakLive ? 'true' : 'false'}
+      style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}
+    >
       <header className="top-bar">
         <FirmContextBar firmId={apiSession?.firm_id} role={apiSession?.role} userId={apiSession?.user_id} />
         <FocusChip
@@ -646,10 +712,13 @@ export function AppShell({
           }}
         />
         <span style={{ flex: 1 }} />
-        <Button variant="ghost" onClick={() => setChatPct(resetChatPct())}>
+        {workspaceMode === 'meeting' ? (
+          <SpeakReadyToggle ready={speakLive} onChange={onSpeakReadyChange} />
+        ) : null}
+        <Button variant="ghost" className="speak-ready-dim" onClick={() => setChatPct(resetChatPct())}>
           Reset 56/44
         </Button>
-        <Button variant="ghost" onClick={onSignOut}>
+        <Button variant="ghost" className="speak-ready-dim" onClick={onSignOut}>
           Sign out
         </Button>
       </header>
@@ -690,12 +759,19 @@ export function AppShell({
             scratchpadOpen={scratchpad.open}
             onEnterScratchpad={() => void enterScratchpad()}
             onShowMeeting={() => void loadMeeting()}
+            onLeaveMeeting={workspaceMode === 'meeting' ? leaveMeeting : undefined}
           />
           <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'grid', gap: 16 }}>
             {!scratchpad.open ? diffPanel : null}
             {workspaceMode === 'meeting' ? (
               <>
-                <MeetingOnePager report={meeting} missing={meetingMissing} />
+                <MeetingOnePager
+                  report={meeting}
+                  missing={meetingMissing}
+                  enlarged={speakLive}
+                  openIndex={receiptOpenIndex}
+                  onOpenIndexChange={setReceiptOpenIndex}
+                />
                 <SendMeetingBar disabled={!meeting} busy={busy} onSend={(channel) => void sendMeeting(channel)} />
               </>
             ) : workspaceMode === 'report' ? (
