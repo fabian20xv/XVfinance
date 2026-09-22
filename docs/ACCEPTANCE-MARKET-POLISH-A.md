@@ -14,7 +14,7 @@ Pete locked. Ship the thin UI against this bar only. Tess develops Preview only 
 
 ## Stub-first (Preview today)
 
-On develop Preview, `get_quote` for SPY is expected stub (`last: null`) until the env fix lands. That is a **pass** when:
+Confirmed on develop Preview: `get_quote` for SPY is stub and has no last price. Live `MARKET_API_KEY` + `MARKET_API_BASE` is later and does **not** block this PR. Stub is a **pass** when:
 
 1. **Stub / sample data** is visible on the quote card and Market pane.
 2. Cards stay readable with null `last` / `pe` / `market_cap` (symbol, name, currency, N/A — never blank or broken).

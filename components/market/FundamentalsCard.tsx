@@ -15,8 +15,10 @@ export function FundamentalsCard({ payload }: { payload: FundamentalsPayload }) 
     <article data-ui="chat.fundamentals_card" data-symbol={payload.symbol ?? ''} className="market-card">
       <header className="market-card-head">
         <div>
-          <strong>{payload.symbol || 'Fundamentals'}</strong>
-          {payload.name ? <div className="market-card-sub">{payload.name}</div> : null}
+          <strong data-field="symbol">{payload.symbol || 'Fundamentals'}</strong>
+          <div className="market-card-sub" data-field="name">
+            {formatMarketField(payload.name)}
+          </div>
         </div>
         <MarketSourceBadge payload={payload} />
       </header>
@@ -31,12 +33,11 @@ export function FundamentalsCard({ payload }: { payload: FundamentalsPayload }) 
         </div>
         <div>
           <dt>Mkt cap</dt>
-          <dd className="tabular">
-            {formatMarketCap(payload.market_cap)}
-            {payload.market_cap != null && payload.market_cap !== '' && payload.currency
-              ? ` ${payload.currency}`
-              : ''}
-          </dd>
+          <dd className="tabular">{formatMarketCap(payload.market_cap)}</dd>
+        </div>
+        <div>
+          <dt>Currency</dt>
+          <dd data-field="currency">{formatMarketField(payload.currency)}</dd>
         </div>
       </dl>
     </article>

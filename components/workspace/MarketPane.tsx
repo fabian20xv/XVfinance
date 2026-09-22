@@ -27,7 +27,12 @@ export function MarketPane({ workspace }: { workspace: MarketWorkspaceModel | nu
   const stub = panes.some((row) => isStubMarket(row.payload));
   const badgePayload = stub ? { stub: true } : { stub: false, provider: 'http' };
   return (
-    <div data-ui="workspace.market_pane" data-blank="false" className="market-pane">
+    <div
+      data-ui="workspace.market_pane"
+      data-blank="false"
+      data-stub={stub ? 'true' : 'false'}
+      className="market-pane"
+    >
       <div className="market-card-head">
         <strong>Market</strong>
         <MarketSourceBadge payload={badgePayload} />

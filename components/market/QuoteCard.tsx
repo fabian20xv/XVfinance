@@ -1,5 +1,5 @@
 import { MarketSourceBadge } from '@/components/market/MarketSourceBadge';
-import { formatAsOf, formatQuoteChange, formatQuoteLast } from '@/src/web/market-ui.js';
+import { formatAsOf, formatMarketField, formatQuoteChange, formatQuoteLast } from '@/src/web/market-ui.js';
 
 type QuotePayload = {
   symbol?: string | null;
@@ -16,14 +16,18 @@ export function QuoteCard({ payload }: { payload: QuotePayload }) {
     <article data-ui="chat.quote_card" data-symbol={payload.symbol ?? ''} className="market-card">
       <header className="market-card-head">
         <div>
-          <strong>{payload.symbol || 'Quote'}</strong>
-          {payload.name ? <div className="market-card-sub">{payload.name}</div> : null}
+          <strong data-field="symbol">{payload.symbol || 'Quote'}</strong>
+          <div className="market-card-sub" data-field="name">
+            {formatMarketField(payload.name)}
+          </div>
         </div>
         <MarketSourceBadge payload={payload} />
       </header>
       <div className="market-price tabular">
         <span data-field="last">{lastLabel}</span>
-        {payload.currency ? <span className="market-card-sub">{payload.currency}</span> : null}
+        <span className="market-card-sub" data-field="currency">
+          {formatMarketField(payload.currency)}
+        </span>
       </div>
       {change ? (
         <div className="tabular market-card-sub" data-field="change">

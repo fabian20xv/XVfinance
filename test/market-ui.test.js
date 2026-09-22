@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { runChatTurn } from '../src/ai/runtime/turn.js';
+import { StubMarketProvider } from '../src/market/provider.js';
 import { SMOKE_FIRM_ID, SMOKE_MANAGER_ID } from '../src/db/smoke-ids.js';
 import { ALLOWED_SUPABASE_URL } from '../src/config/supabase-lock.js';
 import {
@@ -45,15 +46,21 @@ describe('market polish A', () => {
     assert.equal(formatMarketCap(2_500_000_000_000), '2.50T');
   });
 
-  it('opens a non-blank workspace model from a stub quote', () => {
-    const quote = {
-      provider: 'stub',
-      stub: true,
-      symbol: 'SPY',
-      last: null,
-      currency: 'USD',
-      as_of: null,
-    };
+  it('opens a non-blank workspace model from a stub quote', async () => {
+    const quote = await new StubMarketProvider().getQuote({ symbol: 'SPY' });
+    assert.equal(quote.stub, true);
+    assert.equal(quote.symbol, 'SPY');
+    assert.equal(quote.name, 'SPDR S&P 500 ETF');
+    assert.equal(quote.currency, 'USD');
+    assert.equal(quote.last, null);
+    assert.equal(isStubMarket(quote), true);
+    assert.equal(formatQuoteLast(quote.last), 'N/A');
+    assert.equal(formatMarketField(quote.name), 'SPDR S&P 500 ETF');
+    const fundamentals = await new StubMarketProvider().getFundamentals({ symbol: 'SPY' });
+    assert.equal(fundamentals.pe, null);
+    assert.equal(fundamentals.market_cap, null);
+    assert.equal(formatMarketField(fundamentals.sector), 'N/A');
+    assert.equal(formatMarketCap(fundamentals.market_cap), 'N/A');
     const workspace = applyMarketWorkspace(null, 'get_quote', quote);
     assert.equal(marketWorkspaceHasContent(workspace), true);
     assert.equal(workspace.quote.symbol, 'SPY');
@@ -127,7 +134,11 @@ describe('market polish A', () => {
     assert.match(thread, /MarketResultCard/);
     assert.match(thread, /ToolStatusPill/);
     assert.match(quote, /data-ui="chat.quote_card"/);
+    assert.match(quote, /data-field="name"/);
+    assert.match(quote, /data-field="currency"/);
     assert.match(quote, /formatQuoteLast/);
+    assert.match(read('components/market/FundamentalsCard.tsx'), /data-field="currency"/);
+    assert.match(pane, /data-stub=/);
     assert.match(badge, /Stub \/ sample data/);
     assert.match(badge, /Live/);
     assert.match(shell, /workspaceMode === 'market'/);
