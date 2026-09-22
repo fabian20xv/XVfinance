@@ -5,6 +5,7 @@ import { ConfirmCard, type ConfirmCardModel } from '@/components/chat/ConfirmCar
 import type { ConfirmOutcome } from '@/components/chat/ConfirmActions';
 import { Composer } from '@/components/chat/Composer';
 import { ToolStatusPill } from '@/components/chat/ToolStatusPill';
+import { MarketResultCard } from '@/components/market/MarketResultCard';
 import { DashedEmptySlot } from '@/components/workspace/DashedEmptySlot';
 import { twinOutcome } from '@/src/web/dual-confirm.js';
 
@@ -12,6 +13,7 @@ export type ChatToolEvent = {
   id?: string;
   name?: string;
   status: 'running' | 'ok' | 'error' | 'pending_confirm';
+  market?: Record<string, unknown> | null;
 };
 
 export type ChatMessage = {
@@ -116,6 +118,19 @@ export function ChatThread({
                           name={tool.name}
                         />
                       ))}
+                    </div>
+                  ) : null}
+                  {message.role === 'assistant' && message.tools?.some((tool) => tool.market && tool.status === 'ok') ? (
+                    <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
+                      {message.tools.map((tool) =>
+                        tool.market && tool.status === 'ok' ? (
+                          <MarketResultCard
+                            key={`market-${tool.id ?? tool.name}`}
+                            name={tool.name}
+                            payload={tool.market}
+                          />
+                        ) : null
+                      )}
                     </div>
                   ) : null}
                 </div>

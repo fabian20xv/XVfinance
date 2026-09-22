@@ -72,6 +72,7 @@ export type ChatSseToolEvent = {
   error?: { code?: string; message?: string };
   confirm_card?: unknown;
   workspace_panel?: unknown;
+  market?: Record<string, unknown> | null;
 };
 
 export type ChatTurnResult = {
@@ -84,6 +85,12 @@ export type ChatTurnResult = {
     meeting?: unknown;
     report?: unknown;
     scratchpad?: unknown;
+    market?: {
+      quote?: Record<string, unknown> | null;
+      fundamentals?: Record<string, unknown> | null;
+      news?: Record<string, unknown> | null;
+      search?: Record<string, unknown> | null;
+    } | null;
   };
   error?: { code?: string; message?: string };
   status: number;
