@@ -655,6 +655,81 @@ body {
   animation-iteration-count: 120;
 }
 
+.market-pane,
+.market-card {
+  display: grid;
+  gap: 8px;
+}
+
+.market-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 10px 12px;
+}
+
+.market-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.market-card-sub,
+.market-card-meta {
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.market-card-meta {
+  font-size: 11px;
+}
+
+.market-price {
+  font-size: 20px;
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.market-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.market-facts dt {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.market-facts dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+}
+
+.market-list {
+  margin: 0;
+  padding-left: 16px;
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.market-live-badge {
+  font-size: 11px;
+  color: var(--ink-muted);
+  letter-spacing: 0.02em;
+}
+
+.market-stub-badge {
+  white-space: nowrap;
+}
+
 @keyframes stream-caret {
   0%,
   49% {

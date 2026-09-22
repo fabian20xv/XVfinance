@@ -9,6 +9,7 @@ export function WorkspaceHeader({
   onEnterScratchpad,
   onShowMeeting,
   onLeaveMeeting,
+  onLeaveMarket,
 }: {
   title: string;
   asOf?: string | null;
@@ -16,6 +17,7 @@ export function WorkspaceHeader({
   onEnterScratchpad?: () => void;
   onShowMeeting?: () => void;
   onLeaveMeeting?: () => void;
+  onLeaveMarket?: () => void;
 }) {
   return (
     <header
@@ -39,6 +41,11 @@ export function WorkspaceHeader({
       <span style={{ flex: 1 }} />
       {onLeaveMeeting ? (
         <Button variant="ghost" data-ui="workspace.leave_meeting" aria-label="Leave meeting" onClick={onLeaveMeeting}>
+          Leave
+        </Button>
+      ) : null}
+      {onLeaveMarket ? (
+        <Button variant="ghost" data-ui="workspace.leave_market" aria-label="Leave market" onClick={onLeaveMarket}>
           Leave
         </Button>
       ) : null}

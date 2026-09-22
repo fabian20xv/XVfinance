@@ -18,6 +18,7 @@ import { SpeakReadyToggle } from '@/components/shell/SpeakReadyToggle';
 import { DiffConfirmPanel, type DiffPanelModel } from '@/components/workspace/DiffConfirmPanel';
 import { EmptyWorkspace } from '@/components/workspace/EmptyWorkspace';
 import { HoldingsTable, type CashStrip, type HoldingRow } from '@/components/workspace/HoldingsTable';
+import { MarketPane, type MarketWorkspaceModel } from '@/components/workspace/MarketPane';
 import { ReportDraftView, type ReportDraft } from '@/components/workspace/ReportDraftView';
 import { WorkspaceHeader } from '@/components/workspace/WorkspaceHeader';
 import { callTool, streamChatTurn, v1Fetch } from '@/lib/api';
@@ -37,6 +38,13 @@ import { clampChatPct, resetChatPct } from '@/src/web/split.js';
 import { scrollDiffPanelIfClipped } from '@/src/web/confirm-ui.js';
 import { focusEntityLabel } from '@/src/web/receipt-ui.js';
 import { SPEAK_EMPTY_RECEIPTS, resolveSpeakReady, speakReceiptShortcut } from '@/src/web/speak-ready.js';
+import {
+  applyMarketWorkspace,
+  isMarketTool,
+  marketWorkspaceHasContent,
+  payloadFromArtifact,
+  workspaceFromArtifact,
+} from '@/src/web/market-ui.js';
 import { roleCanConfirm, roleCanReject } from '@/src/proposals/defaults.js';
 
 type SessionPayload = { user_id: string; firm_id: string; role: 'manager' | 'analyst' };
@@ -79,7 +87,8 @@ export function AppShell({
   const [cash, setCash] = useState<CashStrip | null>(null);
   const [report, setReport] = useState<ReportDraft | null>(null);
   const [meeting, setMeeting] = useState<MeetingReport | null>(null);
-  const [workspaceMode, setWorkspaceMode] = useState<'live' | 'meeting' | 'report'>('live');
+  const [workspaceMode, setWorkspaceMode] = useState<'live' | 'meeting' | 'report' | 'market'>('live');
+  const [marketWorkspace, setMarketWorkspace] = useState<MarketWorkspaceModel | null>(null);
   const [meetingMissing, setMeetingMissing] = useState(false);
   const [speakReady, setSpeakReady] = useState(false);
   const [receiptOpenIndex, setReceiptOpenIndex] = useState<number | null>(null);
@@ -356,6 +365,15 @@ export function AppShell({
           if (!event.name) {
             return;
           }
+          const toolName = event.name;
+          const marketPayload =
+            event.market && event.status === 'ok' && isMarketTool(toolName)
+              ? (event.market as Record<string, unknown>)
+              : null;
+          if (marketPayload) {
+            setMarketWorkspace((prev) => applyMarketWorkspace(prev, toolName, marketPayload));
+            setWorkspaceMode('market');
+          }
           setMessages((list) =>
             list.map((row) => {
               if (row.id !== assistantId) {
@@ -365,24 +383,26 @@ export function AppShell({
               const idx = tools.findIndex((tool) =>
                 event.id
                   ? tool.id === event.id
-                  : tool.name === event.name && tool.status === 'running'
+                  : tool.name === toolName && tool.status === 'running'
               );
               if (event.status === 'running' && idx === -1) {
                 tools.push({
                   id: event.id,
-                  name: event.name,
+                  name: toolName,
                   status: 'running',
                 });
               } else if (idx >= 0) {
                 tools[idx] = {
                   ...tools[idx],
                   status: event.status ?? tools[idx].status,
+                  ...(marketPayload ? { market: marketPayload } : {}),
                 };
               } else if (event.status) {
                 tools.push({
                   id: event.id,
-                  name: event.name,
+                  name: toolName,
                   status: event.status,
+                  ...(marketPayload ? { market: marketPayload } : {}),
                 });
               }
               return { ...row, tools };
@@ -438,6 +458,28 @@ export function AppShell({
       if (report) {
         setReport(report);
         setWorkspaceMode('report');
+      }
+      const marketArtifact = result.artifacts?.market;
+      if (marketArtifact && typeof marketArtifact === 'object') {
+        setMarketWorkspace((prev) => workspaceFromArtifact(marketArtifact, prev));
+        if (!meeting && !report && marketWorkspaceHasContent(workspaceFromArtifact(marketArtifact))) {
+          setWorkspaceMode('market');
+        }
+        setMessages((list) =>
+          list.map((row) => {
+            if (row.id !== assistantId) {
+              return row;
+            }
+            const tools = (row.tools ?? []).map((tool) => {
+              if (tool.market || !tool.name) {
+                return tool;
+              }
+              const slot = payloadFromArtifact(marketArtifact, tool.name) as Record<string, unknown> | null;
+              return slot ? { ...tool, market: slot, status: tool.status === 'running' ? 'ok' : tool.status } : tool;
+            });
+            return { ...row, tools };
+          })
+        );
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Chat turn failed.';
@@ -649,6 +691,9 @@ export function AppShell({
     if (workspaceMode === 'report') {
       return 'Report draft';
     }
+    if (workspaceMode === 'market') {
+      return 'Market';
+    }
     const label = portfolios.find((row) => row.id === portfolioId)?.label;
     return label ?? 'Workspace';
   }, [workspaceMode, portfolios, portfolioId]);
@@ -760,6 +805,7 @@ export function AppShell({
             onEnterScratchpad={() => void enterScratchpad()}
             onShowMeeting={() => void loadMeeting()}
             onLeaveMeeting={workspaceMode === 'meeting' ? leaveMeeting : undefined}
+            onLeaveMarket={workspaceMode === 'market' ? () => setWorkspaceMode('live') : undefined}
           />
           <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'grid', gap: 16 }}>
             {!scratchpad.open ? diffPanel : null}
@@ -776,6 +822,8 @@ export function AppShell({
               </>
             ) : workspaceMode === 'report' ? (
               <ReportDraftView report={report} />
+            ) : workspaceMode === 'market' ? (
+              <MarketPane workspace={marketWorkspace} />
             ) : portfolioId ? (
               <HoldingsTable
                 holdings={holdings}

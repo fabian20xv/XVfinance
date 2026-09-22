@@ -3,6 +3,7 @@
  * Chat path never imports service-role. Tool execution is user JWT + RLS.
  */
 import { createChatToolEnv, assertNoServiceRoleEnv } from '../../security/service-role-guard.js';
+import { applyMarketArtifact, isMarketTool } from '../../web/market-ui.js';
 import { buildSystemPrompt } from '../prompts/system.js';
 import { openaiToolDefinitions } from '../tools/adapter.js';
 import { executeAgentTool, parseToolCallArguments, stringifyToolResult } from '../tools/execute.js';
@@ -76,6 +77,9 @@ function mergeArtifacts(artifacts, name, data) {
   }
   if (name === 'create_scratchpad' || name === 'get_scratchpad' || name === 'get_scratchpad_impact') {
     next.scratchpad = data;
+  }
+  if (isMarketTool(name)) {
+    next.market = applyMarketArtifact(next.market, name, data);
   }
   const ui = extractProposalUi(data);
   if (ui.confirm_card) {
@@ -217,6 +221,7 @@ export async function runChatTurn({
       );
       const status = result?.ok ? (pending ? 'pending_confirm' : 'ok') : 'error';
       const ui = result?.ok ? extractProposalUi(result.data) : { confirm_card: null, workspace_panel: null };
+      const market = result?.ok && isMarketTool(call.name) ? result.data : null;
       emit({
         event: 'tool',
         data: {
@@ -227,6 +232,7 @@ export async function runChatTurn({
           error: result?.error,
           ...(ui.confirm_card ? { confirm_card: ui.confirm_card } : {}),
           ...(ui.workspace_panel ? { workspace_panel: ui.workspace_panel } : {}),
+          ...(market ? { market } : {}),
         },
       });
       toolTrace.push({
@@ -264,6 +270,7 @@ export async function runChatTurn({
       meeting: artifacts.meeting ?? null,
       report: artifacts.report ?? null,
       scratchpad: artifacts.scratchpad ?? null,
+      market: artifacts.market ?? null,
     },
     model: openaiProvider.model ?? resolveChatLimits(env).model,
   };
